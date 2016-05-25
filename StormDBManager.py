@@ -26,7 +26,7 @@ class StormDBManager:
         self.store = Store(self._database)
 
     @transact
-    def execute_query(self, query, arguments = None):
+    def execute_query(self, query, arguments=None):
         """
         Executes a query on the twisted thread-pool using the storm framework.
         :param query: The sql query to be executed
@@ -35,12 +35,12 @@ class StormDBManager:
         such as cursors cannot be returned.
         """
         connection = Connection(self._database)
-        connection.execute( query, arguments, noresult=True)
+        connection.execute(query, arguments, noresult=True)
         connection.commit()
         connection.close()
 
     @transact
-    def fetch_one(self, query, arguments = None):
+    def fetch_one(self, query, arguments=None):
         """
         Executes a query on the twisted thread-pool using the storm framework and returns the first result.
         :param query: The sql query to be executed.
@@ -49,13 +49,13 @@ class StormDBManager:
         The result would be the same as using execute and calling the next() function on it.
         """
         connection = Connection(self._database)
-        result = connection.execute( query, arguments).get_one()
+        result = connection.execute(query, arguments).get_one()
         connection.commit()
         connection.close()
         return result
 
     @transact
-    def fetch_all(self, query, arguments):
+    def fetch_all(self, query, arguments=None):
         """
         Executes a query on the twisted thread-pool using the storm framework and
         returns all results as a list of tuples.
@@ -71,7 +71,22 @@ class StormDBManager:
         """
         Inserts data provided as keyword arguments into the table provided as an argument.
         :param table_name: The name of the table the data has to be inserted into.
-        :param argv: Keyword arguments for the column and the value to be inserted.
+        :param argv: A dictionary where the key represents the column and the value the value to be inserted.
+        :return: A deferred that fires when the data has been inserted.
+        """
+        connection = Connection(self._database)
+        self._insert(connection, table_name, **argv)
+        connection.commit()
+        connection.close()
+
+    def _insert(self, connection, table_name, **argv):
+        """
+        Utility function to insert data which is not decorated by the @transact to prevent
+        a loop calling this function to create many threads.
+        Do NOT call this function on the main thread, it will be then blocking on that thread.
+        :param connection: The database connection object.
+        :param table_name: The name of the table the data has to be inserted into.
+        :param argv: A dictionary where the key represents the column and the value the value to be inserted.
         :return: A deferred that fires when the data has been inserted.
         """
         if len(argv) == 0: return
@@ -81,7 +96,21 @@ class StormDBManager:
             questions = '?,' * len(argv)
             sql = u'INSERT INTO %s %s VALUES (%s);' % (table_name, tuple(argv.keys()), questions[:-1])
 
-        connection = Connection(self._database)
         connection.execute(sql, argv.values())
+
+    @transact
+    def insert_many(self, table_name, arg_list):
+        """
+        Inserts many items into the database
+        :param table_name: the table name that you want to insert to.
+        :param arg_list: A list contaning dictionaries where the key is the column name and
+        the value the value to be inserted into this column.
+        :return: A deferred that fires once the bulk insertion is done.
+        """
+        if len(arg_list) == 0: return
+        connection = Connection(self._database)
+        for args in arg_list:
+            self._insert(connection, table_name, **args)
+
         connection.commit()
         connection.close()
