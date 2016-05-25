@@ -96,7 +96,7 @@ class StormDBManager:
             questions = '?,' * len(argv)
             sql = u'INSERT INTO %s %s VALUES (%s);' % (table_name, tuple(argv.keys()), questions[:-1])
 
-        connection.execute(sql, argv.values())
+        connection.execute(sql, argv.values(), noresult=True)
 
     @transact
     def insert_many(self, table_name, arg_list):
@@ -114,3 +114,22 @@ class StormDBManager:
 
         connection.commit()
         connection.close()
+
+    def delete(self, table_name, **argv):
+        """
+        Utility function to delete from the database.
+        :param table_name: the table name to delete from
+        :param argv: A dictionary containing key values.
+        The key is the column to target and the value can be a tuple or single element.
+        In case the value is a tuple, it can specify the operator.
+        In case the value is a single element, the equals "=" operator is used.
+        :return: A deferred that fires when the deletion has been performed.
+        """
+        sql = u'DELETE FROM %s WHERE ' % table_name
+        for k, v in argv.iteritems():
+            if isinstance(v, tuple):
+                sql += u'%s %s ? AND ' % (k, v[0])
+            else:
+                sql += u'%s=? AND ' % k
+        sql = sql[:-5] # Remove the last AND
+        return self.execute_query(sql, argv.values())
