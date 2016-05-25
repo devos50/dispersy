@@ -149,3 +149,28 @@ class TestStormDBManager(TestCase):
         result_deferred.addCallback(assert_result) # Assert the results
 
         return result_deferred
+
+    @deferred(timeout=5)
+    def test_size(self):
+        """
+        This test tests the size function.
+        """
+        def assert_result(result):
+            self.assertIsInstance(result, tuple, "Result was not a tuple!")
+            self.assertEquals(result[0], 2, "Result was not 2")
+
+        def get_size(_):
+            return self.storm_db.schedule_query(self.storm_db.num_rows, "car")
+
+        def insert_into_db(_):
+            list = []
+            list.append({"brand" : "BMW"})
+            list.append({"brand" : "Volvo"})
+            return self.storm_db.schedule_query(self.storm_db.insert_many, "car", list)
+
+        result_deferred = self.create_car_database() # Create the database
+        result_deferred.addCallback(insert_into_db) # Insert two value
+        result_deferred.addCallback(get_size) # Get the size
+        result_deferred.addCallback(assert_result) # Assert the result
+
+        return result_deferred
