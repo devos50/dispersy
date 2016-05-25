@@ -1,6 +1,8 @@
 from storm.database import Connection
 from storm.locals import *
 from storm.twisted.transact import Transactor, transact
+from twisted.internet.defer import DeferredLock
+
 from twisted.internet import reactor
 
 
@@ -23,7 +25,26 @@ class StormDBManager:
         # This field name must NOT be changed.
         self.transactor = Transactor(reactor.getThreadPool())
 
-        self.store = Store(self._database)
+        # Create a DeferredLock that should be used by callers to schedule their call.
+        self.db_lock = DeferredLock()
+
+    def schedule_query(self, *args, **kwargs):
+        """
+        Utility function to schedule a query to be executed using the db_lock.
+        :param args: The arguments of which the first is self and the second the function to be run.
+        Any additional arguments will be passed as the function arguments.
+        :param kwargs: Keyword arguments that are passed to the function
+        :return: A deferred that fires with the result of the query.
+        """
+        if len(args) < 2:
+            if not args:
+                raise TypeError("run() takes at least 2 arguments, none given.")
+            raise TypeError("%s.run() takes at least 2 arguments, 1 given" % (
+                args[0].__class__.__name__,))
+        f = args[0]
+        args = args[1:]
+
+        self.db_lock.run(f, *args, **kwargs)
 
     @transact
     def execute_query(self, query, arguments=None):
@@ -132,4 +153,5 @@ class StormDBManager:
             else:
                 sql += u'%s=? AND ' % k
         sql = sql[:-5] # Remove the last AND
+        print sql
         return self.execute_query(sql, argv.values())
