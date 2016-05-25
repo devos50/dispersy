@@ -28,7 +28,7 @@ class StormDBManager:
         # Create a DeferredLock that should be used by callers to schedule their call.
         self.db_lock = DeferredLock()
 
-    def schedule_query(self, *args, **kwargs):
+    def schedule_query(*args, **kwargs):
         """
         Utility function to schedule a query to be executed using the db_lock.
         :param args: The arguments of which the first is self and the second the function to be run.
@@ -41,10 +41,10 @@ class StormDBManager:
                 raise TypeError("run() takes at least 2 arguments, none given.")
             raise TypeError("%s.run() takes at least 2 arguments, 1 given" % (
                 args[0].__class__.__name__,))
-        f = args[0]
-        args = args[1:]
+        self, f = args[:2]
+        args = args[2:]
 
-        self.db_lock.run(f, *args, **kwargs)
+        return self.db_lock.run(f, *args, **kwargs)
 
     @transact
     def execute_query(self, query, arguments=None):
@@ -147,11 +147,13 @@ class StormDBManager:
         :return: A deferred that fires when the deletion has been performed.
         """
         sql = u'DELETE FROM %s WHERE ' % table_name
+        arg = []
         for k, v in argv.iteritems():
             if isinstance(v, tuple):
                 sql += u'%s %s ? AND ' % (k, v[0])
+                arg.append(v[1])
             else:
                 sql += u'%s=? AND ' % k
+                arg.append(v)
         sql = sql[:-5] # Remove the last AND
-        print sql
-        return self.execute_query(sql, argv.values())
+        return self.execute_query(sql, arg)
