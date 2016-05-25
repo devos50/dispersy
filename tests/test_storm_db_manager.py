@@ -21,21 +21,30 @@ class TestStormDBManager(TestCase):
         # Delete the database file.
         os.unlink(self.SQLITE_TEST_DB)
 
+    def create_car_database(self):
+        """
+        Creates a database with the name "car".
+        Contains one column named "brand".
+        :return: A deferred that fires once the table has been made.
+        """
+        sql = u"CREATE TABLE car(brand);"
+        return self.storm_db.execute_query(sql)
+
+
     @deferred(timeout=5)
     def test_execute_function(self):
-        sql = u"CREATE TABLE car(brand);"
-
         def check_return_is_none(result):
             self.assertIsNone(result)
 
-        result_deferred = self.storm_db.execute_query(sql)
+        result_deferred = self.create_car_database()
         result_deferred.addCallback(check_return_is_none)
         return result_deferred
 
     @deferred(timeout=5)
     def test_insert_and_fetchone(self):
-        sql = u"CREATE TABLE car(brand);"
-
+        """
+        This test tests the insert functionality and the fetch_one function.
+        """
         def assert_result(result):
             self.assertIsInstance(result, tuple, "Result was not a tuple!")
             self.assertEquals(result[0], "BMW", "Result did not contain BMW as expected!")
@@ -47,9 +56,36 @@ class TestStormDBManager(TestCase):
         def insert_into_db(_):
             return self.storm_db.insert("car", brand="BMW")
 
-        result_deferred = self.storm_db.execute_query(sql) # Create the database
+        result_deferred = self.create_car_database() # Create the database
         result_deferred.addCallback(insert_into_db) # Insert one value
         result_deferred.addCallback(fetch_inserted) # Fetch the value
         result_deferred.addCallback(assert_result) # Assert the result
+
+        return result_deferred
+
+    @deferred(timeout=5)
+    def test_insert_and_fetchall(self):
+        """
+        This test tests the insert_many functionality and the fetch_all functionality.
+        """
+        def assert_result(result):
+            self.assertIsInstance(result, list, "Result was not a list!")
+            self.assertEquals(result[0][0], "BMW", "First result did not contain BMW as expected!")
+            self.assertEquals(result[1][0], "Volvo", "Seconds result did not contain Volvo as expected!")
+
+        def fetch_inserted(_):
+            sql = u"SELECT * FROM car"
+            return self.storm_db.fetch_all(sql)
+
+        def insert_into_db(_):
+            list = []
+            list.append({"brand" : "BMW"})
+            list.append({"brand" : "Volvo"})
+            return self.storm_db.insert_many("car", list)
+
+        result_deferred = self.create_car_database() # Create the database
+        result_deferred.addCallback(insert_into_db) # Insert two value
+        result_deferred.addCallback(fetch_inserted) # Fetch all values
+        result_deferred.addCallback(assert_result) # Assert the results
 
         return result_deferred
