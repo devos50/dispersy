@@ -56,7 +56,6 @@ class StormDBManager:
         """
         connection = Connection(self._database)
         connection.execute(query, arguments, noresult=True)
-        connection.commit()
         connection.close()
 
     @transact
@@ -70,7 +69,6 @@ class StormDBManager:
         """
         connection = Connection(self._database)
         result = connection.execute(query, arguments).get_one()
-        connection.commit()
         connection.close()
         return result
 
@@ -96,7 +94,6 @@ class StormDBManager:
         """
         connection = Connection(self._database)
         self._insert(connection, table_name, **argv)
-        connection.commit()
         connection.close()
 
     def _insert(self, connection, table_name, **argv):
@@ -132,7 +129,6 @@ class StormDBManager:
         for args in arg_list:
             self._insert(connection, table_name, **args)
 
-        connection.commit()
         connection.close()
 
     def delete(self, table_name, **argv):
