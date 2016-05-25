@@ -36,9 +36,20 @@ class TestStormDBManager(TestCase):
     def test_insert_and_fetchone(self):
         sql = u"CREATE TABLE car(brand);"
 
-        def run_query(_):
+        def assert_result(result):
+            self.assertIsInstance(result, tuple, "Result was not a tuple!")
+            self.assertEquals(result[0], "BMW", "Result did not contain BMW as expected!")
+
+        def fetch_inserted(_):
+            sql = u"SELECT * FROM car"
+            return self.storm_db.fetch_one(sql)
+
+        def insert_into_db(_):
             return self.storm_db.insert("car", brand="BMW")
 
+        result_deferred = self.storm_db.execute_query(sql) # Create the database
+        result_deferred.addCallback(insert_into_db) # Insert one value
+        result_deferred.addCallback(fetch_inserted) # Fetch the value
+        result_deferred.addCallback(assert_result) # Assert the result
 
-        result_deferred = self.storm_db.execute_query(sql)
-        return result_deferred.addCallback(run_query)
+        return result_deferred
