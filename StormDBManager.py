@@ -157,3 +157,13 @@ class StormDBManager:
                 arg.append(v)
         sql = sql[:-5] # Remove the last AND
         return self.execute_query(sql, arg)
+
+    def num_rows(self, table_name):
+        """
+        Utility function to get the number of rows of a table.
+        :param table_name: The table name
+        :return: A deferred that fires with the number of rows in the table.
+        """
+        sql = u"SELECT count(*) FROM %s LIMIT 1" % table_name
+        result = self.fetch_one(sql)
+        return result
