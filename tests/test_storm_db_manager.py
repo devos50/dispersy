@@ -14,15 +14,17 @@ class TestStormDBManager(TestCase):
 
     def setUp(self):
         super(TestStormDBManager, self).setUp()
-        # Do not use an in-memory database. Different connections to the same
-        # in-memory database do not point towards the same database.
-        # See: http://blog.devork.be/2010/11/storm-and-sqlite-in-memory-databases.html
-        self.storm_db = StormDBManager("sqlite:%s" % self.SQLITE_TEST_DB)
-    def tearDown(self):
-        super(TestStormDBManager, self).tearDown()
         # Delete the database file if not using an in-memory database.
         if os.path.exists(self.SQLITE_TEST_DB):
             os.unlink(self.SQLITE_TEST_DB)
+
+        # Do not use an in-memory database. Different connections to the same
+        # in-memory database do not point towards the same database.
+        # http://stackoverflow.com/questions/3315046/sharing-a-memory-database-between-different-threads-in-python-using-sqlite3-pa
+        self.storm_db = StormDBManager("sqlite:%s" % self.SQLITE_TEST_DB)
+        
+    def tearDown(self):
+        super(TestStormDBManager, self).tearDown()
 
     def create_car_database(self):
         """
