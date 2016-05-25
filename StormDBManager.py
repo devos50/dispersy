@@ -18,7 +18,6 @@ class StormDBManager:
         Sets up the database and all necessary elements for the
         database manager to function.
         """
-        # This is currently an IN MEMORY database
         self._database = create_database(db_path)
 
         # The transactor is required when you have methods decorated with the @transact decorator
