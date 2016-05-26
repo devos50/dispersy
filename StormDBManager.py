@@ -32,23 +32,24 @@ class StormDBManager:
         self.db_lock = DeferredLock()
 
         self._version = 1
-        self._get_version()
+        self._retrieve_version()
 
-    def _get_version(self):
+    def _retrieve_version(self):
         """
         Attempts to retrieve the current datbase version from the MyInfo table.
         If it fails, the _version field remains at 1 as defined in the init function.
         """
         def on_result(result):
-            version_str = result[0]
-            self._version = int(version_str)
-            self._logger.info(u"Current database version is %s", self._version)
+            if result:
+                version_str = result[0]
+                self._version = int(version_str)
+                self._logger.info(u"Current database version is %s", self._version)
 
         def on_error(failure):
             self._logger.exception(u"Failed to load database version: %s", failure.getTraceback())
 
         # Schedule the query and add a callback and errback to the deferred.
-        self.fetch_one(u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
+        return self.fetch_one(u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
 
     def schedule_query(*args, **kwargs):
         """
