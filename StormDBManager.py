@@ -1,3 +1,4 @@
+import logging
 from storm.database import Connection
 from storm.locals import *
 from storm.twisted.transact import Transactor, transact
@@ -18,6 +19,9 @@ class StormDBManager:
         Sets up the database and all necessary elements for the
         database manager to function.
         """
+        self._logger = logging.getLogger(self.__class__.__name__)
+
+        # Open or create the database
         self._database = create_database(db_path)
 
         # The transactor is required when you have methods decorated with the @transact decorator
@@ -26,6 +30,25 @@ class StormDBManager:
 
         # Create a DeferredLock that should be used by callers to schedule their call.
         self.db_lock = DeferredLock()
+
+        self._version = 1
+        self._get_version()
+
+    def _get_version(self):
+        """
+        Attempts to retrieve the current datbase version from the MyInfo table.
+        If it fails, the _version field remains at 1 as defined in the init function.
+        """
+        def on_result(result):
+            version_str = result[0]
+            self._version = int(version_str)
+            self._logger.info(u"Current database version is %s", self._version)
+
+        def on_error(failure):
+            self._logger.exception(u"Failed to load database version: %s", failure.getTraceback())
+
+        # Schedule the query and add a callback and errback to the deferred.
+        self.fetch_one(u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
 
     def schedule_query(*args, **kwargs):
         """
