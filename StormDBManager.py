@@ -21,8 +21,7 @@ class StormDBManager:
         """
         self._logger = logging.getLogger(self.__class__.__name__)
 
-        # Open or create the database
-        self._database = create_database(db_path)
+        self.db_path = db_path
 
         # The transactor is required when you have methods decorated with the @transact decorator
         # This field name must NOT be changed.
@@ -31,8 +30,15 @@ class StormDBManager:
         # Create a DeferredLock that should be used by callers to schedule their call.
         self.db_lock = DeferredLock()
 
-        self._version = 1
+    def initialize(self):
+        """
+        Opens/creates the database and initializes the version.
+        """
+        # Open or create the database
+        self._database = create_database(self.db_path)
+        self._version = 0
         self._retrieve_version()
+
 
     def _retrieve_version(self):
         """
@@ -49,25 +55,18 @@ class StormDBManager:
             self._logger.exception(u"Failed to load database version: %s", failure.getTraceback())
 
         # Schedule the query and add a callback and errback to the deferred.
-        return self.fetch_one(u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
+        return self.schedule_query(self.fetch_one, u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
 
-    def schedule_query(*args, **kwargs):
+    def schedule_query(self, callable, *args, **kwargs):
         """
         Utility function to schedule a query to be executed using the db_lock.
-        :param args: The arguments of which the first is self and the second the function to be run.
-        Any additional arguments will be passed as the function arguments.
-        :param kwargs: Keyword arguments that are passed to the function
+        :param callable: The database function that is to be executed.
+        :param args: Any additional arguments that will be passed as the callable's arguments.
+        :param kwargs: Keyword arguments that are passed to the callable function.
         :return: A deferred that fires with the result of the query.
         """
-        if len(args) < 2:
-            if not args:
-                raise TypeError("run() takes at least 2 arguments, none given.")
-            raise TypeError("%s.run() takes at least 2 arguments, 1 given" % (
-                args[0].__class__.__name__,))
-        self, f = args[:2]
-        args = args[2:]
 
-        return self.db_lock.run(f, *args, **kwargs)
+        return self.db_lock.run(callable, *args, **kwargs)
 
     @transact
     def execute_query(self, query, arguments=None):
@@ -109,7 +108,7 @@ class StormDBManager:
         return connection.execute(query, arguments).get_all()
 
     @transact
-    def insert(self, table_name, **argv):
+    def insert(self, table_name, **kwargs):
         """
         Inserts data provided as keyword arguments into the table provided as an argument.
         :param table_name: The name of the table the data has to be inserted into.
@@ -117,10 +116,10 @@ class StormDBManager:
         :return: A deferred that fires when the data has been inserted.
         """
         connection = Connection(self._database)
-        self._insert(connection, table_name, **argv)
+        self._insert(connection, table_name, **kwargs)
         connection.close()
 
-    def _insert(self, connection, table_name, **argv):
+    def _insert(self, connection, table_name, **kwargs):
         """
         Utility function to insert data which is not decorated by the @transact to prevent
         a loop calling this function to create many threads.
@@ -130,14 +129,14 @@ class StormDBManager:
         :param argv: A dictionary where the key represents the column and the value the value to be inserted.
         :return: A deferred that fires when the data has been inserted.
         """
-        if len(argv) == 0: return
-        if len(argv) == 1:
-            sql = u'INSERT INTO %s (%s) VALUES (?);' % (table_name, argv.keys()[0])
+        if len(kwargs) == 0: raise ValueError("No keyword arguments supplied.")
+        if len(kwargs) == 1:
+            sql = u'INSERT INTO %s (%s) VALUES (?);' % (table_name, kwargs.keys()[0])
         else:
-            questions = '?,' * len(argv)
-            sql = u'INSERT INTO %s %s VALUES (%s);' % (table_name, tuple(argv.keys()), questions[:-1])
+            questions = ','.join(('?',)*len(kwargs))
+            sql = u'INSERT INTO %s %s VALUES (%s);' % (table_name, tuple(kwargs.keys()), questions)
 
-        connection.execute(sql, argv.values(), noresult=True)
+        connection.execute(sql, kwargs.values(), noresult=True)
 
     @transact
     def insert_many(self, table_name, arg_list):
@@ -155,7 +154,7 @@ class StormDBManager:
 
         connection.close()
 
-    def delete(self, table_name, **argv):
+    def delete(self, table_name, **kwargs):
         """
         Utility function to delete from the database.
         :param table_name: the table name to delete from
@@ -167,7 +166,7 @@ class StormDBManager:
         """
         sql = u'DELETE FROM %s WHERE ' % table_name
         arg = []
-        for k, v in argv.iteritems():
+        for k, v in kwargs.iteritems():
             if isinstance(v, tuple):
                 sql += u'%s %s ? AND ' % (k, v[0])
                 arg.append(v[1])
@@ -177,7 +176,7 @@ class StormDBManager:
         sql = sql[:-5] # Remove the last AND
         return self.execute_query(sql, arg)
 
-    def num_rows(self, table_name):
+    def count(self, table_name):
         """
         Utility function to get the number of rows of a table.
         :param table_name: The table name

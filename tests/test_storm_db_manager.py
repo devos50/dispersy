@@ -19,6 +19,7 @@ class TestStormDBManager(TestCase):
         # in-memory database do not point towards the same database.
         # http://stackoverflow.com/questions/3315046/sharing-a-memory-database-between-different-threads-in-python-using-sqlite3-pa
         self.storm_db = StormDBManager("sqlite:%s" % self.SQLITE_TEST_DB)
+        self.storm_db.initialize()
 
     def tearDown(self):
         super(TestStormDBManager, self).tearDown()
@@ -183,7 +184,7 @@ class TestStormDBManager(TestCase):
             self.assertEquals(result[0], 2, "Result was not 2")
 
         def get_size(_):
-            return self.storm_db.schedule_query(self.storm_db.num_rows, "car")
+            return self.storm_db.schedule_query(self.storm_db.count, "car")
 
         def insert_into_db(_):
             list = []
@@ -199,18 +200,18 @@ class TestStormDBManager(TestCase):
         return result_deferred
 
     @deferred(timeout=5)
-    def test_version(self):
+    def test_version_no_table(self):
         """
-        This test tests whether the version is 1 if an sql error occurs.
+        This test tests whether the version is 0 if an sql error occurs.
         In this case the table MyInfo does not exist.
         """
 
         def assert_result(_):
             self.assertIsInstance(self.storm_db._version, int, "_version field is not an int!")
-            self.assertEqual(self.storm_db._version, 1, "Version was not 1 while it should be!")
+            self.assertEqual(self.storm_db._version, 0, "Version was not 0 but: %r" % self.storm_db._version)
 
         def get_size(_):
-            return self.storm_db.schedule_query(self.storm_db.num_rows, "car")
+            return self.storm_db.schedule_query(self.storm_db.count, "car")
 
         result_deferred = self.create_car_database()  # Create the car table
         result_deferred.addCallback(get_size)  # Get the version
@@ -219,9 +220,9 @@ class TestStormDBManager(TestCase):
         return result_deferred
 
     @deferred(timeout=5)
-    def test_version(self):
+    def test_version_myinfo_table(self):
         """
-        This test tests whether the version is 1 if the MyInfo table exists.
+        This test tests whether the version is 2 if the MyInfo table exists.
         """
 
         def assert_result(_):
@@ -229,7 +230,7 @@ class TestStormDBManager(TestCase):
             self.assertEqual(self.storm_db._version, 2, "Version was not 2 but: %r" % self.storm_db._version)
 
         def get_version(_):
-            return self.storm_db.schedule_query(self.storm_db._retrieve_version)
+            return self.storm_db._retrieve_version()
 
         def insert_version(_):
             return self.storm_db.schedule_query(self.storm_db.insert, "MyInfo", entry="version", value="2")
