@@ -34,7 +34,7 @@ class TestStormDBManager(TestCase):
         :return: A deferred that fires once the table has been made.
         """
         sql = u"CREATE TABLE car(brand);"
-        return self.storm_db.schedule_query(self.storm_db.execute_query, sql)
+        return self.storm_db.execute(sql)
 
     def create_myinfo_table(self):
         """
@@ -48,7 +48,7 @@ class TestStormDBManager(TestCase):
             value  text
             );
         """
-        return self.storm_db.schedule_query(self.storm_db.execute_query, sql)
+        return self.storm_db.execute(sql)
 
     @deferred(timeout=5)
     def test_execute_function(self):
@@ -71,10 +71,10 @@ class TestStormDBManager(TestCase):
 
         def fetch_inserted(_):
             sql = u"SELECT * FROM car"
-            return self.storm_db.schedule_query(self.storm_db.fetch_one, sql)
+            return self.storm_db.fetchone(sql)
 
         def insert_into_db(_):
-            return self.storm_db.schedule_query(self.storm_db.insert, "car", brand="BMW")
+            return self.storm_db.insert( "car", brand="BMW")
 
         result_deferred = self.create_car_database()  # Create the car table
         result_deferred.addCallback(insert_into_db)  # Insert one value
@@ -96,13 +96,13 @@ class TestStormDBManager(TestCase):
 
         def fetch_inserted(_):
             sql = u"SELECT * FROM car"
-            return self.storm_db.schedule_query(self.storm_db.fetch_all, sql)
+            return self.storm_db.fetchall(sql)
 
         def insert_into_db(_):
             list = []
             list.append({"brand": "BMW"})
             list.append({"brand": "Volvo"})
-            return self.storm_db.schedule_query(self.storm_db.insert_many, "car", list)
+            return self.storm_db.insert_many( "car", list)
 
         result_deferred = self.create_car_database()  # Create the car table
         result_deferred.addCallback(insert_into_db)  # Insert two value
@@ -123,16 +123,16 @@ class TestStormDBManager(TestCase):
 
         def fetch_inserted(_):
             sql = u"SELECT * FROM car"
-            return self.storm_db.schedule_query(self.storm_db.fetch_all, sql)
+            return self.storm_db.fetchall(sql)
 
         def delete_one(_):
-            return self.storm_db.schedule_query(self.storm_db.delete, "car", brand="BMW")
+            return self.storm_db.delete( "car", brand="BMW")
 
         def insert_into_db(_):
             list = []
             list.append({"brand": "BMW"})
             list.append({"brand": "Volvo"})
-            return self.storm_db.schedule_query(self.storm_db.insert_many, "car", list)
+            return self.storm_db.insert_many("car", list)
 
         result_deferred = self.create_car_database()  # Create the car table
         result_deferred.addCallback(insert_into_db)  # Insert two value
@@ -154,16 +154,16 @@ class TestStormDBManager(TestCase):
 
         def fetch_inserted(_):
             sql = u"SELECT * FROM car"
-            return self.storm_db.schedule_query(self.storm_db.fetch_all, sql)
+            return self.storm_db.fetchall(sql)
 
         def delete_one(_):
-            return self.storm_db.schedule_query(self.storm_db.delete, "car", brand=("LIKE", "BMW"))
+            return self.storm_db.delete("car", brand=("LIKE", "BMW"))
 
         def insert_into_db(_):
             list = []
             list.append({"brand": "BMW"})
             list.append({"brand": "Volvo"})
-            return self.storm_db.schedule_query(self.storm_db.insert_many, "car", list)
+            return self.storm_db.insert_many("car", list)
 
         result_deferred = self.create_car_database()  # Create the car table
         result_deferred.addCallback(insert_into_db)  # Insert two value
@@ -184,13 +184,13 @@ class TestStormDBManager(TestCase):
             self.assertEquals(result[0], 2, "Result was not 2")
 
         def get_size(_):
-            return self.storm_db.schedule_query(self.storm_db.count, "car")
+            return self.storm_db.count("car")
 
         def insert_into_db(_):
             list = []
             list.append({"brand": "BMW"})
             list.append({"brand": "Volvo"})
-            return self.storm_db.schedule_query(self.storm_db.insert_many, "car", list)
+            return self.storm_db.insert_many("car", list)
 
         result_deferred = self.create_car_database()  # Create the car table
         result_deferred.addCallback(insert_into_db)  # Insert two value
@@ -211,7 +211,7 @@ class TestStormDBManager(TestCase):
             self.assertEqual(self.storm_db._version, 0, "Version was not 0 but: %r" % self.storm_db._version)
 
         def get_size(_):
-            return self.storm_db.schedule_query(self.storm_db.count, "car")
+            return self.storm_db.count("car")
 
         result_deferred = self.create_car_database()  # Create the car table
         result_deferred.addCallback(get_size)  # Get the version
@@ -233,7 +233,7 @@ class TestStormDBManager(TestCase):
             return self.storm_db._retrieve_version()
 
         def insert_version(_):
-            return self.storm_db.schedule_query(self.storm_db.insert, "MyInfo", entry="version", value="2")
+            return self.storm_db.insert("MyInfo", entry="version", value="2")
 
         result_deferred = self.create_myinfo_table()  # Create the database
         result_deferred.addCallback(insert_version)  # Get the version
@@ -258,13 +258,13 @@ class TestStormDBManager(TestCase):
 
         def fetch_all(_):
             sql = u"SELECT * FROM numtest"
-            return self.storm_db.schedule_query(self.storm_db.fetch_all, sql)
+            return self.storm_db.fetchall(sql)
 
         defer_list = []
 
         def schedule_tree_inserts(_):
             for i in xrange(1, 4):
-                defer_list.append(self.storm_db.schedule_query(self.storm_db.insert, "numtest", num=i))
+                defer_list.append(self.storm_db.insert( "numtest", num=i))
 
             return DeferredList(defer_list)
 
@@ -275,7 +275,7 @@ class TestStormDBManager(TestCase):
                   num INTEGER
                 );
             """
-            return self.storm_db.schedule_query(self.storm_db.execute_query, sql)
+            return self.storm_db.execute(sql)
 
         result_deferred = create_numtest_db()
         result_deferred.addCallback(schedule_tree_inserts)

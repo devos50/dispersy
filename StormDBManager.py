@@ -55,7 +55,7 @@ class StormDBManager:
             self._logger.exception(u"Failed to load database version: %s", failure.getTraceback())
 
         # Schedule the query and add a callback and errback to the deferred.
-        return self.schedule_query(self.fetch_one, u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
+        return self.fetchone(u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
 
     def schedule_query(self, callable, *args, **kwargs):
         """
@@ -68,21 +68,23 @@ class StormDBManager:
 
         return self.db_lock.run(callable, *args, **kwargs)
 
-    @transact
-    def execute_query(self, query, arguments=None):
+    def execute(self, query, arguments=None):
         """
         Executes a query on the twisted thread-pool using the storm framework.
         :param query: The sql query to be executed
         :param arguments: Optional arguments that go with the sql query
-        :return: None as this is function is executed on the thread-pool, database objects
-        such as cursors cannot be returned.
+        :return: A deferred that fires once the execution is done, the result will be None.
         """
-        connection = Connection(self._database)
-        connection.execute(query, arguments, noresult=True)
-        connection.close()
 
-    @transact
-    def fetch_one(self, query, arguments=None):
+        @transact
+        def _execute(self, query, arguments=None):
+            connection = Connection(self._database)
+            connection.execute(query, arguments, noresult=True)
+            connection.close()
+
+        return self.db_lock.run(_execute, self, query, arguments)
+
+    def fetchone(self, query, arguments=None):
         """
         Executes a query on the twisted thread-pool using the storm framework and returns the first result.
         :param query: The sql query to be executed.
@@ -90,13 +92,17 @@ class StormDBManager:
         :return: A deferred that fires with the first tuple that matches the query or None.
         The result would be the same as using execute and calling the next() function on it.
         """
-        connection = Connection(self._database)
-        result = connection.execute(query, arguments).get_one()
-        connection.close()
-        return result
 
-    @transact
-    def fetch_all(self, query, arguments=None):
+        @transact
+        def _fetchone(self, query, arguments=None):
+            connection = Connection(self._database)
+            result = connection.execute(query, arguments).get_one()
+            connection.close()
+            return result
+
+        return self.db_lock.run(_fetchone, self, query, arguments)
+
+    def fetchall(self, query, arguments=None):
         """
         Executes a query on the twisted thread-pool using the storm framework and
         returns all results as a list of tuples.
@@ -104,10 +110,14 @@ class StormDBManager:
         :param arguments: Optional arguments that go with the sql query.
         :return: A deferred that fires with a list of tuple results that matches the query or an empty list.
         """
-        connection = Connection(self._database)
-        return connection.execute(query, arguments).get_all()
 
-    @transact
+        @transact
+        def _fetchall(self, query, arguments=None):
+            connection = Connection(self._database)
+            return connection.execute(query, arguments).get_all()
+
+        return self.db_lock.run(_fetchall, self, query, arguments)
+
     def insert(self, table_name, **kwargs):
         """
         Inserts data provided as keyword arguments into the table provided as an argument.
@@ -115,11 +125,15 @@ class StormDBManager:
         :param argv: A dictionary where the key represents the column and the value the value to be inserted.
         :return: A deferred that fires when the data has been inserted.
         """
+        return self.db_lock.run(self._insert, table_name, **kwargs)
+
+    @transact
+    def _insert(self, table_name, **kwargs):
         connection = Connection(self._database)
-        self._insert(connection, table_name, **kwargs)
+        self.__insert(connection, table_name, **kwargs)
         connection.close()
 
-    def _insert(self, connection, table_name, **kwargs):
+    def __insert(self, connection, table_name, **kwargs):
         """
         Utility function to insert data which is not decorated by the @transact to prevent
         a loop calling this function to create many threads.
@@ -138,7 +152,6 @@ class StormDBManager:
 
         connection.execute(sql, kwargs.values(), noresult=True)
 
-    @transact
     def insert_many(self, table_name, arg_list):
         """
         Inserts many items into the database
@@ -147,12 +160,16 @@ class StormDBManager:
         the value the value to be inserted into this column.
         :return: A deferred that fires once the bulk insertion is done.
         """
-        if len(arg_list) == 0: return
-        connection = Connection(self._database)
-        for args in arg_list:
-            self._insert(connection, table_name, **args)
 
-        connection.close()
+        @transact
+        def _insertmany(self, table_name, arg_list):
+            if len(arg_list) == 0: return
+            connection = Connection(self._database)
+            for args in arg_list:
+                self.__insert(connection, table_name, **args)
+            connection.close()
+
+        return self.db_lock.run(_insertmany, self, table_name, arg_list)
 
     def delete(self, table_name, **kwargs):
         """
@@ -174,7 +191,7 @@ class StormDBManager:
                 sql += u'%s=? AND ' % k
                 arg.append(v)
         sql = sql[:-5] # Remove the last AND
-        return self.execute_query(sql, arg)
+        return self.execute(sql, arg)
 
     def count(self, table_name):
         """
@@ -183,5 +200,5 @@ class StormDBManager:
         :return: A deferred that fires with the number of rows in the table.
         """
         sql = u"SELECT count(*) FROM %s LIMIT 1" % table_name
-        result = self.fetch_one(sql)
+        result = self.fetchone(sql)
         return result
