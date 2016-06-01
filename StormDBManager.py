@@ -76,7 +76,7 @@ class StormDBManager:
         :return: A deferred that fires once the execution is done, the result will be None.
         """
 
-        @transact
+        # @transact
         def _execute(self, query, arguments=None):
             connection = Connection(self._database)
             connection.execute(query, arguments, noresult=True)
@@ -93,7 +93,7 @@ class StormDBManager:
         The result would be the same as using execute and calling the next() function on it.
         """
 
-        @transact
+        # @transact
         def _fetchone(self, query, arguments=None):
             connection = Connection(self._database)
             result = connection.execute(query, arguments).get_one()
@@ -111,7 +111,7 @@ class StormDBManager:
         :return: A deferred that fires with a list of tuple results that matches the query or an empty list.
         """
 
-        @transact
+        # @transact
         def _fetchall(self, query, arguments=None):
             connection = Connection(self._database)
             return connection.execute(query, arguments).get_all()
@@ -127,7 +127,7 @@ class StormDBManager:
         """
         return self.db_lock.run(self._insert, table_name, **kwargs)
 
-    @transact
+    # @transact
     def _insert(self, table_name, **kwargs):
         connection = Connection(self._database)
         self.__insert(connection, table_name, **kwargs)
@@ -161,7 +161,7 @@ class StormDBManager:
         :return: A deferred that fires once the bulk insertion is done.
         """
 
-        @transact
+        # @transact
         def _insertmany(self, table_name, arg_list):
             if len(arg_list) == 0: return
             connection = Connection(self._database)

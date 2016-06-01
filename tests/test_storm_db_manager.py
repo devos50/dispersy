@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from nose.twistedtools import deferred
 
-from StormDBManager import StormDBManager
+from ..StormDBManager import StormDBManager
 
 
 class TestStormDBManager(TestCase):
