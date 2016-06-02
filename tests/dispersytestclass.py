@@ -115,5 +115,5 @@ class DispersyTestFunc(TestCase):
     @inlineCallbacks
     def _create_node(self, dispersy, community_class, c_master_member):
         node = DebugNode(self, dispersy)
-        yield node.initialize_community(community_class, c_master_member)
+        yield node.initialize(community_class, c_master_member)
         returnValue(node)
