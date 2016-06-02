@@ -11,6 +11,7 @@ import thread
 from abc import ABCMeta, abstractmethod
 from sqlite3 import Connection
 
+from StormDBManager import StormDBManager
 from .util import attach_runtime_statistics
 
 
@@ -76,6 +77,7 @@ class Database(object):
         self._connection = None
         self._cursor = None
         self._database_version = 0
+        self.stormdb = StormDBManager(self._file_path)
 
         # _commit_callbacks contains a list with functions that are called on each database commit
         self._commit_callbacks = []
@@ -93,6 +95,7 @@ class Database(object):
         if __debug__:
             self._debug_thread_ident = thread.get_ident()
         self._logger.debug("open database [%s]", self._file_path)
+        self.stormdb.initialize()
         self._connect()
         if initial_statements:
             self._initial_statements()
@@ -113,7 +116,8 @@ class Database(object):
         return True
 
     def _connect(self):
-        self._connection = Connection(self._file_path)
+        # self._connection = Connection(self._file_path)
+        self._connection = self.stormdb.connection._raw_connection
         self._cursor = self._connection.cursor()
 
     def _initial_statements(self):

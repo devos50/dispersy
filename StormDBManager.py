@@ -36,6 +36,7 @@ class StormDBManager:
         """
         # Open or create the database
         self._database = create_database(self.db_path)
+        self.connection = Connection(self._database)
         self._version = 0
         self._retrieve_version()
 
