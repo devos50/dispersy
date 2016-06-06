@@ -103,6 +103,18 @@ class StormDBManager:
         return _execute(self, query, arguments, get_lastrowid)
         #return self.db_lock.run(_execute, self, query, arguments, get_lastrowid)
 
+    def executemany(self, query, list):
+        """
+            Executes a query on the twisted thread-pool using the storm framework many times using the
+            values provided by a list.
+            :param query: The sql query to be executed
+            :param list: The list containing tuples of values to execute the query with.
+            :return: A deferred that fires once the execution is done, the result will be None.
+            """
+
+        for item in list:
+            self.execute(query, item)
+
     def fetchone(self, query, arguments=None):
         """
         Executes a query on the twisted thread-pool using the storm framework and returns the first result.
