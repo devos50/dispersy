@@ -1,5 +1,6 @@
 import logging
 from storm.database import Connection
+from storm.exceptions import OperationalError
 from storm.locals import *
 from storm.twisted.transact import Transactor, transact
 from twisted.internet.defer import DeferredLock
@@ -56,7 +57,17 @@ class StormDBManager:
             self._logger.warning(u"Failed to load database version, setting the DB vesion to 0.")
 
         # Schedule the query and add a callback and errback to the deferred.
-        return self.fetchone(u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
+        # return self.fetchone(u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
+
+        # TEMPORARILY TRY CATCH BECAUSE WE WANT A SYNCHRONOUS, NON-DEFERRED INTERFACE FOR NOW.
+        try:
+            result = self.fetchone(u"SELECT value FROM MyInfo WHERE entry == 'version'")
+            version_str = result[0]
+            self._version = int(version_str)
+            self._logger.info(u"Current database version is %s", self._version)
+
+        except OperationalError:
+            self._version = 0
 
     def schedule_query(self, callable, *args, **kwargs):
         """
@@ -69,7 +80,7 @@ class StormDBManager:
 
         return self.db_lock.run(callable, *args, **kwargs)
 
-    def execute(self, query, arguments=None):
+    def execute(self, query, arguments=None, get_lastrowid=False):
         """
         Executes a query on the twisted thread-pool using the storm framework.
         :param query: The sql query to be executed
@@ -78,12 +89,19 @@ class StormDBManager:
         """
 
         # @transact
-        def _execute(self, query, arguments=None):
-            connection = Connection(self._database)
-            connection.execute(query, arguments, noresult=True)
-            connection.close()
+        def _execute(self, query, arguments=None, get_lastrowid=False):
+            # connection = Connection(self._database)
+            ret = None
+            if get_lastrowid:
+                result = self.connection.execute(query, arguments, noresult=False)
+                ret = result._raw_cursor.lastrowid
+            else:
+                self.connection.execute(query, arguments, noresult=True)
+            # connection.close()
+            return ret
 
-        return self.db_lock.run(_execute, self, query, arguments)
+        return _execute(self, query, arguments, get_lastrowid)
+        #return self.db_lock.run(_execute, self, query, arguments, get_lastrowid)
 
     def fetchone(self, query, arguments=None):
         """
@@ -96,12 +114,13 @@ class StormDBManager:
 
         # @transact
         def _fetchone(self, query, arguments=None):
-            connection = Connection(self._database)
-            result = connection.execute(query, arguments).get_one()
-            connection.close()
+            # connection = Connection(self._database)
+            result = self.connection.execute(query, arguments).get_one()
+            # connection.close()
             return result
 
-        return self.db_lock.run(_fetchone, self, query, arguments)
+        return _fetchone(self, query, arguments)
+        # return self.db_lock.run(_fetchone, self, query, arguments)
 
     def fetchall(self, query, arguments=None):
         """
@@ -114,8 +133,8 @@ class StormDBManager:
 
         # @transact
         def _fetchall(self, query, arguments=None):
-            connection = Connection(self._database)
-            return connection.execute(query, arguments).get_all()
+            # connection = Connection(self._database)
+            return self.connection.execute(query, arguments).get_all()
 
         return self.db_lock.run(_fetchall, self, query, arguments)
 
@@ -130,9 +149,9 @@ class StormDBManager:
 
     # @transact
     def _insert(self, table_name, **kwargs):
-        connection = Connection(self._database)
-        self.__insert(connection, table_name, **kwargs)
-        connection.close()
+        # connection = Connection(self._database)
+        self.__insert(self.connection, table_name, **kwargs)
+        # connection.close()
 
     def __insert(self, connection, table_name, **kwargs):
         """
@@ -151,7 +170,7 @@ class StormDBManager:
             questions = ','.join(('?',)*len(kwargs))
             sql = u'INSERT INTO %s %s VALUES (%s);' % (table_name, tuple(kwargs.keys()), questions)
 
-        connection.execute(sql, kwargs.values(), noresult=True)
+            self.connection.execute(sql, kwargs.values(), noresult=True)
 
     def insert_many(self, table_name, arg_list):
         """
@@ -165,10 +184,10 @@ class StormDBManager:
         # @transact
         def _insertmany(self, table_name, arg_list):
             if len(arg_list) == 0: return
-            connection = Connection(self._database)
+            # connection = Connection(self._database)
             for args in arg_list:
-                self.__insert(connection, table_name, **args)
-            connection.close()
+                self.__insert(self.connection, table_name, **args)
+            # connection.close()
 
         return self.db_lock.run(_insertmany, self, table_name, arg_list)
 
