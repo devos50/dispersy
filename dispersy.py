@@ -561,9 +561,9 @@ class Dispersy(TaskManager):
         """
         assert isinstance(database_id, (int, long)), type(database_id)
         try:
-            public_key, = next(self._database.execute(u"SELECT public_key FROM member WHERE id = ?", (database_id,)))
+            public_key, = self._database.stormdb.fetchone(u"SELECT public_key FROM member WHERE id = ?", (database_id,))
             return self.get_member(public_key=str(public_key))
-        except StopIteration:
+        except TypeError:
             pass
 
     def reclassify_community(self, source, destination):
@@ -604,7 +604,7 @@ class Dispersy(TaskManager):
             master = source.master_member
             source.unload_community()
 
-        self._database.execute(u"UPDATE community SET classification = ? WHERE master = ?",
+        self._database.stormdb.execute(u"UPDATE community SET classification = ? WHERE master = ?",
                                (destination_classification, master.database_id))
 
         if destination_classification in self._auto_load_communities:
