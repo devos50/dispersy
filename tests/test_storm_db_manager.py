@@ -20,6 +20,8 @@ class TestStormDBManager(TestCase):
         # Do not use an in-memory database. Different connections to the same
         # in-memory database do not point towards the same database.
         # http://stackoverflow.com/questions/3315046/sharing-a-memory-database-between-different-threads-in-python-using-sqlite3-pa
+        if not os.path.exists(self.TEST_DATA_DIR):
+            os.mkdir(self.TEST_DATA_DIR)
         self.storm_db = StormDBManager("sqlite:%s" % self.SQLITE_TEST_DB)
         self.storm_db.initialize()
 
