@@ -77,7 +77,11 @@ class Database(object):
         self._connection = None
         self._cursor = None
         self._database_version = 0
-        self.stormdb = StormDBManager(self._file_path)
+        # Storm does not know :memory: so patch it to match what storm db expects
+        if self._file_path == ":memory:":
+            self.stormdb = StormDBManager("sqlite:")
+        else:
+            self.stormdb = StormDBManager(self._file_path)
 
         # _commit_callbacks contains a list with functions that are called on each database commit
         self._commit_callbacks = []
