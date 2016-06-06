@@ -489,7 +489,7 @@ class Dispersy(TaskManager):
         # both public and private keys are valid at this point
 
         # The member is not cached, let's try to get it from the database
-        row = self.database.execute(u"SELECT id, public_key, private_key FROM member WHERE mid = ? LIMIT 1", (buffer(mid),)).fetchone()
+        row = self.database.stormdb.fetchone(u"SELECT id, public_key, private_key FROM member WHERE mid = ? LIMIT 1", (buffer(mid),))
 
         if row:
             database_id, public_key_from_db, private_key_from_db = row
