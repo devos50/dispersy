@@ -501,7 +501,7 @@ class Dispersy(TaskManager):
             if private_key:
                 assert public_key
                 if private_key_from_db != private_key:
-                    self.database.execute(u"UPDATE member SET public_key = ?, private_key = ? WHERE id = ?",
+                    self.database.stormdb.execute(u"UPDATE member SET public_key = ?, private_key = ? WHERE id = ?",
                         (buffer(public_key), buffer(private_key), database_id))
             else:
                 # the private key from the database overrules the public key argument
@@ -511,7 +511,7 @@ class Dispersy(TaskManager):
                 # the public key argument overrules anything in the database
                 elif public_key:
                     if public_key_from_db != public_key:
-                        self.database.execute(u"UPDATE member SET public_key = ? WHERE id = ?",
+                        self.database.stormdb.execute(u"UPDATE member SET public_key = ? WHERE id = ?",
                             (buffer(public_key), database_id))
 
                 # no priv/pubkey arguments passed, maybe use the public key from the database
@@ -526,12 +526,12 @@ class Dispersy(TaskManager):
             if private_key:
                 assert public_key
             # The MID or public/private keys are not in the database, store them.
-            database_id = self.database.execute(
+            database_id = self.database.stormdb.execute(
                 u"INSERT INTO member (mid, public_key, private_key) VALUES (?, ?, ?)",
                 (buffer(mid), buffer(public_key), buffer(private_key)), get_lastrowid=True)
         else:
             # We could't find the key on the DB, nothing else to do
-            database_id = self.database.execute(u"INSERT INTO member (mid) VALUES (?)",
+            database_id = self.database.stormdb.execute(u"INSERT INTO member (mid) VALUES (?)",
                 (buffer(mid),), get_lastrowid=True)
             return DummyMember(self, database_id, mid)
 
