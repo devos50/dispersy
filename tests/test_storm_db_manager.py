@@ -295,7 +295,7 @@ class TestStormDBManager(TestCase):
 
         return result_deferred
 
-    # TODO refactor to use deferrds when lock goes live again.
+    # TODO refactor to use deferreds when lock goes live again.
     def test_insert(self):
         sql = u"""
             CREATE TABLE numtest (
@@ -306,3 +306,17 @@ class TestStormDBManager(TestCase):
         self.storm_db.execute(sql)
         id = self.storm_db.execute(u"INSERT INTO numtest (num) VALUES(?)", (1,), get_lastrowid=True)
         self.assertEqual(id, 1)
+
+    # TODO refactor to use deferreds once the lock goes live again
+    def test_executemany(self):
+        sql = u"""
+            CREATE TABLE numtest (
+              id INTEGER PRIMARY KEY,
+              num INTEGER
+            );
+        """
+        self.storm_db.execute(sql)
+        list = [(1,),(2,),(3,)]
+        sql = u"INSERT INTO numtest (num) VALUES(?)"
+        self.storm_db.executemany(sql, list)
+        self.assertEquals(self.storm_db.count("numtest")[0], 3)
