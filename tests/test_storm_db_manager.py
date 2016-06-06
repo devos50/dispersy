@@ -295,4 +295,14 @@ class TestStormDBManager(TestCase):
 
         return result_deferred
 
-    # TODO add test which covers getlastrowid being true.
+    # TODO refactor to use deferrds when lock goes live again.
+    def test_insert(self):
+        sql = u"""
+            CREATE TABLE numtest (
+              id INTEGER PRIMARY KEY,
+              num INTEGER
+            );
+        """
+        self.storm_db.execute(sql)
+        id = self.storm_db.execute(u"INSERT INTO numtest (num) VALUES(?)", (1,), get_lastrowid=True)
+        self.assertEqual(id, 1)
