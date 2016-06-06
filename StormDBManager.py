@@ -52,8 +52,8 @@ class StormDBManager:
                 self._version = int(version_str)
                 self._logger.info(u"Current database version is %s", self._version)
 
-        def on_error(failure):
-            self._logger.exception(u"Failed to load database version: %s", failure.getTraceback())
+        def on_error(_):
+            self._logger.warning(u"Failed to load database version, setting the DB vesion to 0.")
 
         # Schedule the query and add a callback and errback to the deferred.
         return self.fetchone(u"SELECT value FROM MyInfo WHERE entry == 'version'").addCallbacks(on_result, on_error)
