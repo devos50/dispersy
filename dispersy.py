@@ -1136,7 +1136,7 @@ class Dispersy(TaskManager):
                 unique.add(key)
 
                 if not message.authentication.member.database_id in times:
-                    times[message.authentication.member.database_id] = [global_time for global_time, in self._database.execute(u"SELECT global_time FROM sync WHERE community = ? AND member = ? AND meta_message = ?",
+                    times[message.authentication.member.database_id] = [global_time for global_time, in self._database.stormdb.fetchall(u"SELECT global_time FROM sync WHERE community = ? AND member = ? AND meta_message = ?",
                                                                                                                                (message.community.database_id, message.authentication.member.database_id, message.database_id))]
                     assert len(times[message.authentication.member.database_id]) <= message.distribution.history_size, [message.packet_id, message.distribution.history_size, times[message.authentication.member.database_id]]
                 tim = times[message.authentication.member.database_id]
