@@ -960,7 +960,9 @@ class Dispersy(TaskManager):
         # a message is considered unique when (creator, global-time),
         # i.e. (authentication.member.database_id, distribution.global_time), is unique.
         unique = set()
-        execute = self._database.execute
+        execute = self._database.stormdb.execute
+        fetchone = self._database.stormdb.fetchone
+
         enable_sequence_number = messages[0].meta.distribution.enable_sequence_number
 
         # sort the messages by their (1) global_time and (2) binary packet
@@ -974,8 +976,8 @@ class Dispersy(TaskManager):
             highest = {}
             for message in messages:
                 if not message.authentication.member.database_id in highest:
-                    last_global_time, last_seq, count = execute(u"SELECT MAX(global_time), MAX(sequence), COUNT(*) FROM sync WHERE member = ? AND meta_message = ?",
-                                                    (message.authentication.member.database_id, message.database_id)).next()
+                    last_global_time, last_seq, count = fetchone(u"SELECT MAX(global_time), MAX(sequence), COUNT(*) FROM sync WHERE member = ? AND meta_message = ?",
+                                                    (message.authentication.member.database_id, message.database_id))
                     highest[message.authentication.member.database_id] = (last_global_time or 0, last_seq or 0)
                     assert last_seq or 0 == count, [last_seq, count, message.name]
 
@@ -1001,8 +1003,8 @@ class Dispersy(TaskManager):
                     # we already have this message (drop)
 
                     # fetch the corresponding packet from the database (it should be binary identical)
-                    global_time, packet = execute(u"SELECT global_time, packet FROM sync WHERE member = ? AND meta_message = ? ORDER BY global_time, packet LIMIT 1 OFFSET ?",
-                                                  (message.authentication.member.database_id, message.database_id, message.distribution.sequence_number - 1)).next()
+                    global_time, packet = fetchone(u"SELECT global_time, packet FROM sync WHERE member = ? AND meta_message = ? ORDER BY global_time, packet LIMIT 1 OFFSET ?",
+                                                  (message.authentication.member.database_id, message.database_id, message.distribution.sequence_number - 1))
                     packet = str(packet)
                     if message.packet == packet:
                         yield DropMessage(message, "duplicate message by binary packet")
@@ -1025,8 +1027,8 @@ class Dispersy(TaskManager):
                                     (message.authentication.member.database_id, message.database_id, global_time))
 
                             # by deleting messages we changed SEQ and the HIGHEST cache
-                            last_global_time, last_seq, count = execute(u"SELECT MAX(global_time), MAX(sequence), COUNT(*) FROM sync WHERE member = ? AND meta_message = ?",
-                                                           (message.authentication.member.database_id, message.database_id)).next()
+                            last_global_time, last_seq, count = fetchone(u"SELECT MAX(global_time), MAX(sequence), COUNT(*) FROM sync WHERE member = ? AND meta_message = ?",
+                                                           (message.authentication.member.database_id, message.database_id))
                             highest[message.authentication.member.database_id] = (last_global_time or 0, last_seq or 0)
                             assert last_seq or 0 == count, [last_seq, count, message.name]
                             # we can allow MESSAGE to be processed
