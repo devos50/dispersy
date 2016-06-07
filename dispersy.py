@@ -1151,9 +1151,9 @@ class Dispersy(TaskManager):
                     # apparently the sender does not have this message yet
                     if message.distribution.history_size == 1:
                         try:
-                            packet, = self._database.execute(u"SELECT packet FROM sync WHERE community = ? AND member = ? ORDER BY global_time DESC LIMIT 1",
-                                                             (message.community.database_id, message.authentication.member.database_id)).next()
-                        except StopIteration:
+                            packet, = self._database.stormdb.fetchone(u"SELECT packet FROM sync WHERE community = ? AND member = ? ORDER BY global_time DESC LIMIT 1",
+                                                             (message.community.database_id, message.authentication.member.database_id))
+                        except TypeError:
                             # TODO can still fail when packet is in one of the received messages
                             # from this batch.
                             pass
