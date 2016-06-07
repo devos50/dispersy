@@ -3472,7 +3472,7 @@ class Community(TaskManager):
                 parameters.append((message.packet_id, self.database_id, message.payload.member.database_id, message.payload.global_time))
                 real_messages.append(message)
 
-        self._dispersy._database.executemany(u"UPDATE sync SET undone = ? "
+        self._dispersy._database.stormdb.executemany(u"UPDATE sync SET undone = ? "
                                              u"WHERE community = ? AND member = ? AND global_time = ?", parameters)
 
         for meta, sub_messages in groupby(real_messages, key=lambda x: x.payload.packet.meta):
