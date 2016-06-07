@@ -922,7 +922,7 @@ class Dispersy(TaskManager):
 
                     if have_packet < message.packet:
                         # replace our current message with the other one
-                        self._database.execute(u"UPDATE sync SET packet = ? WHERE community = ? AND member = ? AND global_time = ?",
+                        self._database.stormdb.execute(u"UPDATE sync SET packet = ? WHERE community = ? AND member = ? AND global_time = ?",
                                                (buffer(message.packet), community.database_id, message.authentication.member.database_id, message.distribution.global_time))
 
                         # notify that global times have changed
@@ -1246,7 +1246,7 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
 
                                 if have_packet < message.packet:
                                     # replace our current message with the other one
-                                    self._database.execute(u"UPDATE sync SET member = ?, packet = ? WHERE id = ?",
+                                    self._database.stormdb.execute(u"UPDATE sync SET member = ?, packet = ? WHERE id = ?",
                                                            (message.authentication.member.database_id, buffer(message.packet), packet_id))
 
                                     return DropMessage(message, "replaced existing packet with other packet with the same payload")
@@ -1555,6 +1555,7 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
             if is_double_member_authentication:
                 member1 = message.authentication.members[0].database_id
                 member2 = message.authentication.members[1].database_id
+                # TODO replace with storm db insert
                 self._database.execute(u"INSERT INTO double_signed_sync (sync, member1, member2) VALUES (?, ?, ?)",
                                        (message.packet_id, member1, member2) if member1 < member2 else (message.packet_id, member2, member1))
 
