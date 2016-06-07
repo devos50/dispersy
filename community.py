@@ -3663,8 +3663,8 @@ class HardKilledCommunity(Community):
         super(HardKilledCommunity, self).initialize(*args, **kargs)
         destroy_message_id = self._meta_messages[u"dispersy-destroy-community"].database_id
         try:
-            packet, = self._dispersy.database.execute(u"SELECT packet FROM sync WHERE meta_message = ? LIMIT 1", (destroy_message_id,)).next()
-        except StopIteration:
+            packet, = self._dispersy.database.stormdb.fetchone(u"SELECT packet FROM sync WHERE meta_message = ? LIMIT 1", (destroy_message_id,))
+        except TypeError:
             self._logger.error("unable to locate the dispersy-destroy-community message")
             self._destroy_community_packet = ""
         else:
