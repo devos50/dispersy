@@ -1589,22 +1589,22 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
                     order = lambda member1, member2: (member1, member2) if member1 < member2 else (member2, member1)
                     for member1, member2 in set(order(message.authentication.members[0].database_id, message.authentication.members[1].database_id) for message in messages):
                         assert member1 < member2, [member1, member2]
-                        all_items = list(self._database.execute(u"""
+                        all_items = self._database.stormdb.fetchall(u"""
 SELECT sync.id, sync.global_time
 FROM sync
 JOIN double_signed_sync ON double_signed_sync.sync = sync.id
 WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed_sync.member2 = ?
-ORDER BY sync.global_time, sync.packet""", (meta.database_id, member1, member2)))
+ORDER BY sync.global_time, sync.packet""", (meta.database_id, member1, member2))
                         if len(all_items) > meta.distribution.history_size:
                             items.update(all_items[:len(all_items) - meta.distribution.history_size])
 
                 else:
                     for member_database_id in set(message.authentication.member.database_id for message in messages):
-                        all_items = list(self._database.execute(u"""
+                        all_items = self._database.stormdb.fetchall(u"""
 SELECT id, global_time
 FROM sync
 WHERE meta_message = ? AND member = ?
-ORDER BY global_time""", (meta.database_id, member_database_id)))
+ORDER BY global_time""", (meta.database_id, member_database_id))
                         if len(all_items) > meta.distribution.history_size:
                             items.update(all_items[:len(all_items) - meta.distribution.history_size])
 
