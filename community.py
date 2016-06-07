@@ -3104,10 +3104,10 @@ class Community(TaskManager):
     def on_missing_proof(self, messages):
         for message in messages:
             try:
-                packet, = self._dispersy._database.execute(u"SELECT packet FROM sync WHERE community = ? AND member = ? AND global_time = ? LIMIT 1",
-                                                          (self.database_id, message.payload.member.database_id, message.payload.global_time)).next()
+                packet, = self._dispersy._database.stormdb.fetchone(u"SELECT packet FROM sync WHERE community = ? AND member = ? AND global_time = ? LIMIT 1",
+                                                          (self.database_id, message.payload.member.database_id, message.payload.global_time))
 
-            except StopIteration:
+            except TypeError:
                 self._logger.warning("someone asked for proof for a message that we do not have")
 
             else:
