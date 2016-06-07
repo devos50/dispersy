@@ -3309,12 +3309,12 @@ class Community(TaskManager):
         # infinate data traffic).  nodes that notice this behavior must blacklist the offending
         # node.  hence we ensure that we did not send an undo before
         try:
-            undone, = self._dispersy._database.execute(u"SELECT undone FROM sync WHERE community = ? AND member = ? AND global_time = ?",
-                                                      (self.database_id, message.authentication.member.database_id, message.distribution.global_time)).next()
+            undone, = self._dispersy._database.stormdb.fetchone(u"SELECT undone FROM sync WHERE community = ? AND member = ? AND global_time = ?",
+                                                      (self.database_id, message.authentication.member.database_id, message.distribution.global_time))
 
-        except StopIteration:
+        except TypeError:
+            # TODO(Laurens): This can probably refactored to be more nice? maybe raise something.
             assert False, "The message that we want to undo does not exist.  Programming error"
-            return None
 
         else:
             if undone:
@@ -3323,7 +3323,7 @@ class Community(TaskManager):
                                    "trying to return the previous undo message")
                 undo_own_meta = self.get_meta_message(u"dispersy-undo-own")
                 undo_other_meta = self.get_meta_message(u"dispersy-undo-other")
-                for packet_id, message_id, packet in self._dispersy._database.execute(
+                for packet_id, message_id, packet in self._dispersy._database.stormdb.fetchall(
                         u"SELECT id, meta_message, packet FROM sync WHERE community = ? AND member = ? AND meta_message IN (?, ?)",
                         (self.database_id, message.authentication.member.database_id, undo_own_meta.database_id, undo_other_meta.database_id)):
                     self._logger.debug("checking: %s", message_id)
