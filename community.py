@@ -3652,8 +3652,8 @@ class Community(TaskManager):
         numbers are used.
         """
         assert isinstance(meta.distribution, FullSyncDistribution), "currently only FullSyncDistribution allows sequence numbers"
-        sequence_number, = self._dispersy._database.execute(u"SELECT COUNT(*) FROM sync WHERE member = ? AND sync.meta_message = ?",
-                                                           (self.master_member.database_id, meta.database_id)).next()
+        sequence_number, = self._dispersy._database.stormdb.fetchone(u"SELECT COUNT(*) FROM sync WHERE member = ? AND sync.meta_message = ?",
+                                                           (self.master_member.database_id, meta.database_id))
         return sequence_number + 1
 
 
