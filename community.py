@@ -1857,12 +1857,10 @@ class Community(TaskManager):
             has_identity = member.has_identity(self)
             if not has_identity:
                 # check database and update identity set if found
-                try:
-                    self._dispersy.database.execute(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ? LIMIT 1",
-                        (member.database_id, self.get_meta_message(u"dispersy-identity").database_id)).next()
-                except StopIteration:
-                    pass
-                else:
+                sync_packet = self._dispersy.database.stormdb.fetchone(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ? LIMIT 1",
+                    (member.database_id, self.get_meta_message(u"dispersy-identity").database_id))
+
+                if sync_packet:
                     member.add_identity(self)
                     has_identity = True
             if has_identity:
