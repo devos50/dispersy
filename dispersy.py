@@ -1390,9 +1390,9 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
         assert isinstance(packet_id, (int, long)), type(packet_id)
 
         try:
-            packet, undone = self._database.execute(u"SELECT packet, undone FROM sync WHERE id = ?",
-                                                       (packet_id,)).next()
-        except StopIteration:
+            packet, undone = self._database.stormdb.fetchone(u"SELECT packet, undone FROM sync WHERE id = ?",
+                                                       (packet_id,))
+        except TypeError:
             return None
 
         message = self.convert_packet_to_message(str(packet), community, verify=verify)
