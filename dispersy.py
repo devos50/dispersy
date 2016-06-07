@@ -704,9 +704,9 @@ class Dispersy(TaskManager):
         assert isinstance(member, Member)
         assert isinstance(global_time, (int, long))
         try:
-            packet, = self._database.execute(u"SELECT packet FROM sync WHERE community = ? AND member = ? AND global_time = ?",
-                                             (community.database_id, member.database_id, global_time)).next()
-        except StopIteration:
+            packet, = self._database.stormdb.fetchone(u"SELECT packet FROM sync WHERE community = ? AND member = ? AND global_time = ?",
+                                             (community.database_id, member.database_id, global_time))
+        except TypeError:
             return None
         else:
             return self.convert_packet_to_message(str(packet), community)
@@ -716,9 +716,9 @@ class Dispersy(TaskManager):
         assert isinstance(member, Member)
         assert isinstance(meta, Message)
         try:
-            packet, = self._database.execute(u"SELECT packet FROM sync WHERE member = ? AND meta_message = ? ORDER BY global_time DESC LIMIT 1",
-                                             (member.database_id, meta.database_id)).next()
-        except StopIteration:
+            packet, = self._database.stormdb.fetchone(u"SELECT packet FROM sync WHERE member = ? AND meta_message = ? ORDER BY global_time DESC LIMIT 1",
+                                             (member.database_id, meta.database_id))
+        except TypeError:
             return None
         else:
             return self.convert_packet_to_message(str(packet), community)
