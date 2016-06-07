@@ -2899,10 +2899,10 @@ class Community(TaskManager):
             member_database_id = message.payload.member.database_id
             for global_time in message.payload.global_times:
                 try:
-                    packet, = self._dispersy._database.execute(u"SELECT packet FROM sync WHERE community = ? AND member = ? AND global_time = ?",
-                                                              (self.database_id, member_database_id, global_time)).next()
+                    packet, = self._dispersy._database.stormdb.fetchone(u"SELECT packet FROM sync WHERE community = ? AND member = ? AND global_time = ?",
+                                                              (self.database_id, member_database_id, global_time))
                     responses.append(str(packet))
-                except StopIteration:
+                except TypeError:
                     pass
 
             if responses:
