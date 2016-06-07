@@ -3055,7 +3055,7 @@ class Community(TaskManager):
                 self._logger.debug("fetching member:%d message:%d packets from database for %s",
                                    member_id, message_id, candidate)
                 for range_min, range_max in merge_ranges(sequences):
-                    for packet, in self._dispersy._database.execute(
+                    for packet, in self._dispersy._database.stormdb.fetchall(
                             u"SELECT packet FROM sync "
                             u"WHERE member = ? AND meta_message = ? AND sequence BETWEEN ? AND ? "
                             u"ORDER BY sequence",
