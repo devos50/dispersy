@@ -1571,9 +1571,9 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
             # when sequence numbers are enabled, we must have exactly
             # message.distribution.sequence_number messages in the database
             for member_id, max_sequence_number in highest_sequence_number.iteritems():
-                count_, = self._database.execute(u"SELECT COUNT(*) FROM sync "
+                count_, = self._database.stormdb.fetchone(u"SELECT COUNT(*) FROM sync "
                                                 u"WHERE meta_message = ? AND member = ? AND sequence BETWEEN 1 AND ?",
-                                                (message.database_id, member_id, max_sequence_number)).next()
+                                                (message.database_id, member_id, max_sequence_number))
                 assert count_ == max_sequence_number, [count_, max_sequence_number]
 
         if isinstance(meta.distribution, LastSyncDistribution):
@@ -1620,7 +1620,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id)))
             if __debug__:
                 if not is_double_member_authentication and meta.distribution.custom_callback is None:
                     for message in messages:
-                        history_size, = self._database.execute(u"SELECT COUNT(*) FROM sync WHERE meta_message = ? AND member = ?", (message.database_id, message.authentication.member.database_id)).next()
+                        history_size, = self._database.stormdb.fetchone(u"SELECT COUNT(*) FROM sync WHERE meta_message = ? AND member = ?", (message.database_id, message.authentication.member.database_id))
                         assert history_size <= message.distribution.history_size, [history_size, message.distribution.history_size, message.authentication.member.database_id]
 
         # update the global time
