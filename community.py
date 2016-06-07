@@ -3567,11 +3567,11 @@ class Community(TaskManager):
                         todo.extend(proofs)
 
                 # 1. cleanup the double_signed_sync table.
-                self._dispersy._database.execute(u"DELETE FROM double_signed_sync WHERE sync IN (SELECT id FROM sync JOIN double_signed_sync ON sync.id = double_signed_sync.sync WHERE sync.community = ?)", (self.database_id,))
+                self._dispersy._database.stormdb.execute(u"DELETE FROM double_signed_sync WHERE sync IN (SELECT id FROM sync JOIN double_signed_sync ON sync.id = double_signed_sync.sync WHERE sync.community = ?)", (self.database_id,))
 
                 # 2. cleanup sync table.  everything except what we need to tell others this
                 # community is no longer available
-                self._dispersy._database.execute(u"DELETE FROM sync WHERE community = ? AND id NOT IN (" + u", ".join(u"?" for _ in packet_ids) + ")", [self.database_id] + list(packet_ids))
+                self._dispersy._database.stormdb.execute(u"DELETE FROM sync WHERE community = ? AND id NOT IN (" + u", ".join(u"?" for _ in packet_ids) + ")", [self.database_id] + list(packet_ids))
 
             self._dispersy.reclassify_community(self, new_classification)
 
