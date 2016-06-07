@@ -1091,7 +1091,7 @@ class Community(TaskManager):
                 # Check for messages that need to be pruned because the global time changed.
                 for meta in self._meta_messages.itervalues():
                     if isinstance(meta.distribution, SyncDistribution) and isinstance(meta.distribution.pruning, GlobalTimePruning):
-                         self._dispersy.database.execute(
+                         self._dispersy.database.stormdb.execute(
                             u"DELETE FROM sync WHERE meta_message = ? AND global_time <= ?",
                             (meta.database_id, self._global_time - meta.distribution.pruning.prune_threshold))
 
