@@ -884,9 +884,9 @@ class Dispersy(TaskManager):
         community = message.community
         # fetch the duplicate binary packet from the database
         try:
-            have_packet, undone = self._database.execute(u"SELECT packet, undone FROM sync WHERE community = ? AND member = ? AND global_time = ?",
-                                                        (community.database_id, message.authentication.member.database_id, message.distribution.global_time)).next()
-        except StopIteration:
+            have_packet, undone = self._database.stormdb.fetchone(u"SELECT packet, undone FROM sync WHERE community = ? AND member = ? AND global_time = ?",
+                                                        (community.database_id, message.authentication.member.database_id, message.distribution.global_time))
+        except TypeError:
             self._logger.debug("this message is not a duplicate")
             return False
 
@@ -903,8 +903,8 @@ class Dispersy(TaskManager):
 
                 if undone:
                     try:
-                        proof, = self._database.execute(u"SELECT packet FROM sync WHERE id = ?", (undone,)).next()
-                    except StopIteration:
+                        proof, = self._database.stormdb.fetchone(u"SELECT packet FROM sync WHERE id = ?", (undone,))
+                    except TypeError:
                         pass
                     else:
                         self._send_packets([message.candidate], [str(proof)], community, "-caused by duplicate-undo-")
