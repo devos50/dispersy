@@ -3366,9 +3366,9 @@ class Community(TaskManager):
             if message.payload.packet is None:
                 # obtain the packet that we are attempting to undo
                 try:
-                    packet_id, message_name, packet_data = self._dispersy._database.execute(u"SELECT sync.id, meta_message.name, sync.packet FROM sync JOIN meta_message ON meta_message.id = sync.meta_message WHERE sync.community = ? AND sync.member = ? AND sync.global_time = ?",
-                                                                                           (self.database_id, message.payload.member.database_id, message.payload.global_time)).next()
-                except StopIteration:
+                    packet_id, message_name, packet_data = self._dispersy._database.stormdb.fetchone(u"SELECT sync.id, meta_message.name, sync.packet FROM sync JOIN meta_message ON meta_message.id = sync.meta_message WHERE sync.community = ? AND sync.member = ? AND sync.global_time = ?",
+                                                                                           (self.database_id, message.payload.member.database_id, message.payload.global_time))
+                except TypeError:
                     delay = DelayMessageByMissingMessage(message, message.payload.member, message.payload.global_time)
                     dependencies[message.authentication.member.public_key] = (message.distribution.sequence_number, delay)
                     yield delay
@@ -3403,16 +3403,16 @@ class Community(TaskManager):
                 continue
 
             try:
-                undone, = self._dispersy._database.execute(u"SELECT undone FROM sync WHERE id = ?", (message.payload.packet.packet_id,)).next()
-            except StopIteration:
+                undone, = self._dispersy._database.stormdb.fetchone(u"SELECT undone FROM sync WHERE id = ?", (message.payload.packet.packet_id,))
+            except TypeError:
+                # TODO(Laurens): This can probably refactored to be more nice? maybe raise something.
                 assert False, "The conversion ensures that the packet exists in the DB.  Hence this should never occur"
-                undone = 0
 
             if undone and message.name == u"dispersy-undo-own":
                 # look for other packets we received that undid this packet
                 member = message.authentication.member
                 undo_own_meta = self.get_meta_message(u"dispersy-undo-own")
-                for packet_id, packet in self._dispersy._database.execute(
+                for packet_id, packet in self._dispersy._database.stormdb.fetchall(
                         u"SELECT id, packet FROM sync WHERE community = ? AND member = ? AND meta_message = ?",
                         (self.database_id, member.database_id, undo_own_meta.database_id)):
 
