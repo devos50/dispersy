@@ -3600,15 +3600,15 @@ class Community(TaskManager):
                 self._update_timerange(meta, globaltime_range[0], globaltime_range[1])
 
     def _update_timerange(self, meta, time_low, time_high):
-        execute = self._dispersy._database.execute
-        executemany = self._dispersy._database.executemany
+        executemany = self._dispersy._database.stormdb.executemany
+        fetchall = self._dispersy._database.stormdb.fetchall
 
         self._logger.debug("updating %s [%d:%d]", meta.name, time_low, time_high)
         undo = []
         redo = []
 
-        for packet_id, packet, undone in list(execute(u"SELECT id, packet, undone FROM sync WHERE meta_message = ? AND global_time BETWEEN ? AND ?",
-                                                      (meta.database_id, time_low, time_high))):
+        for packet_id, packet, undone in fetchall(u"SELECT id, packet, undone FROM sync WHERE meta_message = ? AND global_time BETWEEN ? AND ?",
+                                                      (meta.database_id, time_low, time_high)):
             message = self._dispersy.convert_packet_to_message(str(packet), self)
             if message:
                 message.packet_id = packet_id
