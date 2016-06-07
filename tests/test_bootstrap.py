@@ -1,3 +1,4 @@
+import unittest
 from collections import defaultdict
 from copy import copy
 from os import environ, getcwd, path
@@ -29,6 +30,7 @@ MAX_RTT = 0.5
 
 class TestBootstrapServers(DispersyTestFunc):
 
+    @unittest.skip("Very unstable, ERRORS > 80% of the time")
     def test_tracker(self):
         """
         Runs tracker.py and connects to it.
