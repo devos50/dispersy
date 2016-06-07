@@ -662,10 +662,10 @@ class Dispersy(TaskManager):
             if load or auto_load:
                 try:
                     # have we joined this community
-                    classification, auto_load_flag, master_public_key = self._database.execute(u"SELECT community.classification, community.auto_load, member.public_key FROM community JOIN member ON member.id = community.master WHERE mid = ?",
-                                                                                               (buffer(cid),)).next()
+                    classification, auto_load_flag, master_public_key = self._database.stormdb.fetchone(u"SELECT community.classification, community.auto_load, member.public_key FROM community JOIN member ON member.id = community.master WHERE mid = ?",
+                                                                                               (buffer(cid),))
 
-                except StopIteration:
+                except TypeError:
                     pass
 
                 else:
