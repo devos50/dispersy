@@ -1893,21 +1893,21 @@ ORDER BY global_time""", (meta.database_id, member_database_id)))
                 meta_identity = community.get_meta_message(u"dispersy-identity")
 
                 try:
-                    member_id, = self._database.execute(u"SELECT id FROM member WHERE mid = ?", (buffer(community.my_member.mid),)).next()
-                except StopIteration:
+                    member_id, = self._database.stormdb.fetchone(u"SELECT id FROM member WHERE mid = ?", (buffer(community.my_member.mid),))
+                except TypeError:
                     raise ValueError("unable to find the public key for my member")
 
                 if not member_id == community.my_member.database_id:
                     raise ValueError("my member's database id is invalid", member_id, community.my_member.database_id)
 
                 try:
-                    self._database.execute(u"SELECT 1 FROM member WHERE id = ? AND private_key IS NOT NULL", (member_id,)).next()
-                except StopIteration:
+                    self._database.stormdb.fetchone(u"SELECT 1 FROM member WHERE id = ? AND private_key IS NOT NULL", (member_id,))
+                except TypeError:
                     raise ValueError("unable to find the private key for my member")
 
                 try:
-                    self._database.execute(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ?", (member_id, meta_identity.database_id)).next()
-                except StopIteration:
+                    self._database.stormdb.fetchone(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ?", (member_id, meta_identity.database_id))
+                except TypeError:
                     raise ValueError("unable to find the dispersy-identity message for my member")
 
                 self._logger.debug("my identity is OK")
@@ -1942,8 +1942,8 @@ ORDER BY global_time""", (meta.database_id, member_database_id)))
 
                     # get the message that undo_message refers to
                     try:
-                        packet, undone = self._database.execute(u"SELECT packet, undone FROM sync WHERE community = ? AND member = ? AND global_time = ?", (community.database_id, undo_message.payload.member.database_id, undo_message.payload.global_time)).next()
-                    except StopIteration:
+                        packet, undone = self._database.stormdb.fetchone(u"SELECT packet, undone FROM sync WHERE community = ? AND member = ? AND global_time = ?", (community.database_id, undo_message.payload.member.database_id, undo_message.payload.global_time))
+                    except TypeError:
                         raise ValueError("found dispersy-undo-other but not the message that it refers to")
                     packet = str(packet)
                     message = self.convert_packet_to_message(packet, community, verify=False)
@@ -2069,8 +2069,8 @@ ORDER BY global_time""", (meta.database_id, member_database_id)))
                             assert message
 
                             try:
-                                member1, member2 = self._database.execute(u"SELECT member1, member2 FROM double_signed_sync WHERE sync = ?", (packet_id,)).next()
-                            except StopIteration:
+                                member1, member2 = self._database.stormdb.fetchone(u"SELECT member1, member2 FROM double_signed_sync WHERE sync = ?", (packet_id,))
+                            except TypeError:
                                 raise ValueError("found double signed message without an entry in the double_signed_sync table")
 
                             if not member1 < member2:
