@@ -551,7 +551,7 @@ class Community(TaskManager):
         Sets the auto_load flag for this community.
         """
         assert isinstance(auto_load, bool)
-        self._dispersy.database.execute(u"UPDATE community SET auto_load = ? WHERE master = ?",
+        self._dispersy.database.stormdb.execute(u"UPDATE community SET auto_load = ? WHERE master = ?",
                                         (1 if auto_load else 0, self._master_member.database_id))
 
     @property
