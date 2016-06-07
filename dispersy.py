@@ -1211,7 +1211,7 @@ class Dispersy(TaskManager):
                         # into account.
                         times[members] = dict((global_time, (packet_id, str(packet)))
                                               for global_time, packet_id, packet
-                                              in self._database.execute(u"""
+                                              in self._database.stormdb.fetchall(u"""
 SELECT sync.global_time, sync.id, sync.packet
 FROM sync
 JOIN double_signed_sync ON double_signed_sync.sync = sync.id
