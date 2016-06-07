@@ -177,12 +177,12 @@ class Community(TaskManager):
         assert isinstance(dispersy, Dispersy), type(dispersy)
         assert isInIOThread()
         logger.debug("retrieving all master members owning %s communities", cls.get_classification())
-        execute = dispersy.database.execute
+        fetchall = dispersy.database.stormdb.fetchall
         return [dispersy.get_member(public_key=str(public_key)) if public_key else dispersy.get_member(mid=str(mid))
                 for mid, public_key,
-                in list(execute(u"SELECT m.mid, m.public_key FROM community AS c JOIN member AS m ON m.id = c.master"
+                in fetchall(u"SELECT m.mid, m.public_key FROM community AS c JOIN member AS m ON m.id = c.master"
                                 u" WHERE c.classification = ?",
-                                (cls.get_classification(),)))]
+                                (cls.get_classification(),))]
 
     @classmethod
     def init_community(cls, dispersy, master, my_member, *args, **kargs):
@@ -315,23 +315,23 @@ class Community(TaskManager):
         self.register_task("periodic cleanup", LoopingCall(self._periodically_clean_delayed)).start(PERIODIC_CLEANUP_INTERVAL, now=False)
 
         try:
-            self._database_id, my_member_did, self._database_version = self._dispersy.database.execute(
+            self._database_id, my_member_did, self._database_version = self._dispersy.database.stormdb.fetchone(
                 u"SELECT id, member, database_version FROM community WHERE master = ?",
-                (self._master_member.database_id,)).next()
+                (self._master_member.database_id,))
 
             # if we're called with a different my_member, update the table to reflect this
             if my_member_did != self._my_member.database_id:
-                self._dispersy.database.execute(u"UPDATE community SET member = ? WHERE master = ?",
+                self._dispersy.database.stormdb.execute(u"UPDATE community SET member = ? WHERE master = ?",
                     (self._my_member.database_id, self._master_member.database_id))
 
-        except StopIteration:
-            self._dispersy.database.execute(
+        except TypeError:
+            self._dispersy.database.stormdb.execute(
                 u"INSERT INTO community(master, member, classification) VALUES(?, ?, ?)",
                 (self._master_member.database_id, self._my_member.database_id, self.get_classification()))
 
-            self._database_id, self._database_version = self._dispersy.database.execute(
+            self._database_id, self._database_version = self._dispersy.database.stormdb.fetchone(
                 u"SELECT id, database_version FROM community WHERE master = ?",
-                (self._master_member.database_id,)).next()
+                (self._master_member.database_id,))
 
         self._logger.debug("database id:   %d", self._database_id)
 
@@ -353,7 +353,7 @@ class Community(TaskManager):
 
         # batched insert
         update_list = []
-        for database_id, name, priority, direction in self._dispersy.database.execute(u"SELECT id, name, priority, direction FROM meta_message WHERE community = ?", (self._database_id,)):
+        for database_id, name, priority, direction in self._dispersy.database.stormdb.fetchall(u"SELECT id, name, priority, direction FROM meta_message WHERE community = ?", (self._database_id,)):
             meta_message_info = self.meta_message_cache.get(name)
             if meta_message_info:
                 if priority != meta_message_info["priority"] or direction != meta_message_info["direction"]:
@@ -363,17 +363,17 @@ class Community(TaskManager):
                 del self.meta_message_cache[name]
 
         if update_list:
-            self._dispersy.database.executemany(u"UPDATE meta_message SET priority = ?, direction = ? WHERE id = ?",
+            self._dispersy.database.stormdb.executemany(u"UPDATE meta_message SET priority = ?, direction = ? WHERE id = ?",
                 update_list)
 
         if self.meta_message_cache:
             insert_list = []
             for name, data in self.meta_message_cache.iteritems():
                 insert_list.append((self.database_id, name, data["priority"], data["direction"]))
-            self._dispersy.database.executemany(u"INSERT INTO meta_message (community, name, priority, direction) VALUES (?, ?, ?, ?)",
+            self._dispersy.database.stormdb.executemany(u"INSERT INTO meta_message (community, name, priority, direction) VALUES (?, ?, ?, ?)",
                 insert_list)
 
-            for database_id, name in self._dispersy.database.execute(u"SELECT id, name FROM meta_message WHERE community = ?", (self._database_id,)):
+            for database_id, name in self._dispersy.database.stormdb.fetchall(u"SELECT id, name FROM meta_message WHERE community = ?", (self._database_id,)):
                 self._meta_messages[name]._database_id = database_id  # cleanup pre-fetched values
         self.meta_message_cache = None
 
@@ -385,7 +385,7 @@ class Community(TaskManager):
 
         # the global time.  zero indicates no messages are available, messages must have global
         # times that are higher than zero.
-        self._global_time, = self._dispersy.database.execute(u"SELECT MAX(global_time) FROM sync WHERE community = ?", (self._database_id,)).next()
+        self._global_time, = self._dispersy.database.stormdb.fetchone(u"SELECT MAX(global_time) FROM sync WHERE community = ?", (self._database_id,))
         if self._global_time is None:
             self._global_time = 0
         assert isinstance(self._global_time, (int, long))
@@ -393,7 +393,7 @@ class Community(TaskManager):
         self._logger.debug("global time:   %d", self._global_time)
 
         # the sequence numbers
-        for current_sequence_number, name in self._dispersy.database.execute(u"SELECT MAX(sync.sequence), meta_message.name FROM sync, meta_message WHERE sync.meta_message = meta_message.id AND sync.member = ? AND meta_message.community = ? GROUP BY meta_message.name", (self._my_member.database_id, self.database_id)):
+        for current_sequence_number, name in self._dispersy.database.stormdb.fetchall(u"SELECT MAX(sync.sequence), meta_message.name FROM sync, meta_message WHERE sync.meta_message = meta_message.id AND sync.member = ? AND meta_message.community = ? GROUP BY meta_message.name", (self._my_member.database_id, self.database_id)):
             if current_sequence_number:
                 self._meta_messages[name].distribution._current_sequence_number = current_sequence_number
 
@@ -431,13 +431,13 @@ class Community(TaskManager):
                                isinstance(meta.distribution.pruning, GlobalTimePruning)
                                for meta in self._meta_messages.itervalues())
 
-        try:
-            # check if we have already created the identity message
-            self.dispersy._database.execute(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ? LIMIT 1",
-                                   (self._my_member.database_id, self.get_meta_message
-                                    (u"dispersy-identity").database_id)).next()
+        # check if we have already created the identity message
+        member = self.dispersy.database.stormdb.fetchone(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ? LIMIT 1",
+                               (self._my_member.database_id, self.get_meta_message
+                                (u"dispersy-identity").database_id))
+        if member:
             self._my_member.add_identity(self)
-        except StopIteration:
+        else:
             # we haven't do it now
             self.create_identity()
 
@@ -1099,6 +1099,8 @@ class Community(TaskManager):
         """
         Called each time after the community is loaded and attached to Dispersy.
         """
+        # TODO(Laurens): Move this function to the storm db manager or
+        # keep it in dispersydatabase manager but make sure it uses storm.
         self._database_version = self._dispersy.database.check_community_database(self, self._database_version)
 
     def get_conversion_for_packet(self, packet):
