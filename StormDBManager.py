@@ -148,7 +148,8 @@ class StormDBManager:
             # connection = Connection(self._database)
             return self.connection.execute(query, arguments).get_all()
 
-        return self.db_lock.run(_fetchall, self, query, arguments)
+        # return self.db_lock.run(_fetchall, self, query, arguments)
+        return _fetchall(self, query, arguments)
 
     def insert(self, table_name, **kwargs):
         """
@@ -157,7 +158,8 @@ class StormDBManager:
         :param argv: A dictionary where the key represents the column and the value the value to be inserted.
         :return: A deferred that fires when the data has been inserted.
         """
-        return self.db_lock.run(self._insert, table_name, **kwargs)
+        return self._insert(table_name, **kwargs)
+        # return self.db_lock.run(self._insert, table_name, **kwargs)
 
     # @transact
     def _insert(self, table_name, **kwargs):
@@ -201,7 +203,8 @@ class StormDBManager:
                 self.__insert(self.connection, table_name, **args)
             # connection.close()
 
-        return self.db_lock.run(_insertmany, self, table_name, arg_list)
+        return _insertmany(self, table_name, arg_list)
+        # return self.db_lock.run(_insertmany, self, table_name, arg_list)
 
     def delete(self, table_name, **kwargs):
         """
