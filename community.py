@@ -524,8 +524,8 @@ class Community(TaskManager):
                 self._logger.warning("unable to load permissions from database [could not obtain %s]", name)
 
         if mapping:
-            for packet, in list(self._dispersy.database.execute(u"SELECT packet FROM sync WHERE meta_message IN (" + ", ".join("?" for _ in mapping) + ") ORDER BY global_time, packet",
-                                                                mapping.keys())):
+            for packet, in self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync WHERE meta_message IN (" + ", ".join("?" for _ in mapping) + ") ORDER BY global_time, packet",
+                                                                mapping.keys()):
                 message = self._dispersy.convert_packet_to_message(str(packet), self, verify=False)
                 if message:
                     self._logger.debug("processing %s", message.name)
