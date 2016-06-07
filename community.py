@@ -2985,8 +2985,8 @@ class Community(TaskManager):
             mid = message.payload.mid
 
             # we are assuming that no more than 10 members have the same sha1 digest.
-            for member_id in [member_id for member_id, in self._dispersy._database.execute(sql_member, (buffer(mid),))]:
-                packets = [str(packet) for packet, in self._dispersy._database.execute(sql_packet,
+            for member_id in [member_id for member_id, in self._dispersy._database.stormdb.fetchall(sql_member, (buffer(mid),))]:
+                packets = [str(packet) for packet, in self._dispersy._database.stormdb.fetchall(sql_packet,
                                                                                        (self.database_id, member_id, meta_id))]
 
                 if packets:
