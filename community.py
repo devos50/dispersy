@@ -482,8 +482,8 @@ class Community(TaskManager):
         self._logger.debug("using dummy master member")
 
         try:
-            public_key, = self._dispersy.database.execute(u"SELECT public_key FROM member WHERE id = ?", (self._master_member.database_id,)).next()
-        except StopIteration:
+            public_key, = self._dispersy.database.stormdb.fetchone(u"SELECT public_key FROM member WHERE id = ?", (self._master_member.database_id,))
+        except TypeError:
             pass
         else:
             if public_key:
