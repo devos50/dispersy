@@ -881,11 +881,11 @@ class Community(TaskManager):
     def _select_and_fix(self, request_cache, syncable_messages, global_time, to_select, higher=True):
         assert isinstance(syncable_messages, unicode)
         if higher:
-            data = list(self._dispersy.database.execute(u"SELECT global_time, packet FROM sync WHERE meta_message IN (%s) AND undone = 0 AND global_time > ? ORDER BY global_time ASC LIMIT ?" % (syncable_messages),
-                       (global_time, to_select + 1)))
+            data = self._dispersy.database.stormdb.fetchall(u"SELECT global_time, packet FROM sync WHERE meta_message IN (%s) AND undone = 0 AND global_time > ? ORDER BY global_time ASC LIMIT ?" % (syncable_messages),
+                       (global_time, to_select + 1))
         else:
-            data = list(self._dispersy.database.execute(u"SELECT global_time, packet FROM sync WHERE meta_message IN (%s) AND undone = 0 AND global_time < ? ORDER BY global_time DESC LIMIT ?" % (syncable_messages),
-                       (global_time, to_select + 1)))
+            data = self._dispersy.database.stormdb.fetchall(u"SELECT global_time, packet FROM sync WHERE meta_message IN (%s) AND undone = 0 AND global_time < ? ORDER BY global_time DESC LIMIT ?" % (syncable_messages),
+                       (global_time, to_select + 1))
 
         fixed = False
         if len(data) > to_select:
