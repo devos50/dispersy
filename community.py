@@ -3536,8 +3536,8 @@ class Community(TaskManager):
 
                 # we should not remove our own dispersy-identity message
                 try:
-                    packet_id, = self._dispersy._database.execute(u"SELECT id FROM sync WHERE meta_message = ? AND member = ?", (identity_message_id, self.my_member.database_id)).next()
-                except StopIteration:
+                    packet_id, = self._dispersy._database.stormdb.fetchone(u"SELECT id FROM sync WHERE meta_message = ? AND member = ?", (identity_message_id, self.my_member.database_id))
+                except TypeError:
                     pass
                 else:
                     identities.add(self.my_member.public_key)
@@ -3555,9 +3555,9 @@ class Community(TaskManager):
                         if not item.authentication.member.public_key in identities:
                             identities.add(item.authentication.member.public_key)
                             try:
-                                packet_id, = self._dispersy._database.execute(u"SELECT id FROM sync WHERE meta_message = ? AND member = ?",
-                                                                             (identity_message_id, item.authentication.member.database_id)).next()
-                            except StopIteration:
+                                packet_id, = self._dispersy._database.stormdb.fetchone(u"SELECT id FROM sync WHERE meta_message = ? AND member = ?",
+                                                                             (identity_message_id, item.authentication.member.database_id))
+                            except TypeError:
                                 pass
                             else:
                                 packet_ids.add(packet_id)
