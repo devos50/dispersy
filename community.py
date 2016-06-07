@@ -2804,7 +2804,7 @@ class Community(TaskManager):
                 sql_arguments.extend((meta.database_id, _time_low, time_high, offset, modulo))
             self._logger.debug("%s", sql_arguments)
 
-            yield message, ((str(packet),) for packet, in self._dispersy._database.execute(sql, sql_arguments))
+            yield message, ((str(packet),) for packet, in self._dispersy._database.stormdb.fetchall(sql, sql_arguments))
 
     def check_puncture_request(self, messages):
         for message in messages:
