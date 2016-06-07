@@ -1557,9 +1557,12 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
             if is_double_member_authentication:
                 member1 = message.authentication.members[0].database_id
                 member2 = message.authentication.members[1].database_id
-                # TODO replace with storm db insert
-                self._database.execute(u"INSERT INTO double_signed_sync (sync, member1, member2) VALUES (?, ?, ?)",
-                                       (message.packet_id, member1, member2) if member1 < member2 else (message.packet_id, member2, member1))
+                if member1 < member2:
+                    self._database.stormdb.insert(u"double_signed_sync", sync=message.packet_id, member1=member1,
+                                                  member2=member2)
+                else:
+                    self._database.stormdb.insert(u"double_signed_sync", sync=message.packet_id, member1=member2,
+                                                  member2=member1)
 
             # update global time
             highest_global_time = max(highest_global_time, message.distribution.global_time)
