@@ -612,8 +612,8 @@ class Dispersy(TaskManager):
             assert cls == destination, [cls, destination]
 
         else:
-            my_member_did, = self._database.execute(u"SELECT member FROM community WHERE master = ?",
-                               (master.database_id,)).next()
+            my_member_did, = self._database.stormdb.fetchone(u"SELECT member FROM community WHERE master = ?",
+                               (master.database_id,))
 
             my_member = self.get_member_from_database_id(my_member_did)
             args = ()
