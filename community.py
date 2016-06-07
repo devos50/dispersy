@@ -542,8 +542,8 @@ class Community(TaskManager):
         When True, this community will automatically be loaded when a packet is received.
         """
         # currently we grab it directly from the database, should become a property for efficiency
-        return bool(self._dispersy.database.execute(u"SELECT auto_load FROM community WHERE master = ?",
-                                                    (self._master_member.database_id,)).next()[0])
+        return bool(self._dispersy.database.stormdb.fetchone(u"SELECT auto_load FROM community WHERE master = ?",
+                                                    (self._master_member.database_id,))[0])
 
     @dispersy_auto_load.setter
     def dispersy_auto_load(self, auto_load):
