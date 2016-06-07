@@ -1538,7 +1538,7 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
                                message.authentication.member.database_id, message.distribution.global_time)
 
             # add packet to database
-            message.packet_id = self._database.execute(
+            message.packet_id = self._database.stormdb.execute(
                 u"INSERT INTO sync (community, member, global_time, meta_message, packet, sequence) "
                 u"VALUES (?, ?, ?, ?, ?, ?)",
                (message.community.database_id,
