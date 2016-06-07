@@ -1872,12 +1872,12 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
         - check sequence numbers for FullSyncDistribution
         - check history size for LastSyncDistribution
         """
-        def select(sql, bindings):
+        def fetchall(sql, bindings):
             assert isinstance(sql, unicode)
             assert isinstance(bindings, tuple)
             limit = 1000
             for offset in (i * limit for i in count()):
-                rows = list(self._database.execute(sql, bindings + (limit, offset)))
+                rows = self._database.stormdb.fetchall(sql, bindings + (limit, offset))
                 if rows:
                     for row in rows:
                         yield row
@@ -1916,8 +1916,8 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                 # the dispersy-identity must be in the database for each member that has one or more
                 # messages in the database
                 #
-                A = set(id_ for id_, in self._database.execute(u"SELECT member FROM sync WHERE community = ? GROUP BY member", (community.database_id,)))
-                B = set(id_ for id_, in self._database.execute(u"SELECT member FROM sync WHERE meta_message = ?", (meta_identity.database_id,)))
+                A = set(id_ for id_, in fetchall(u"SELECT member FROM sync WHERE community = ? GROUP BY member", (community.database_id,)))
+                B = set(id_ for id_, in fetchall(u"SELECT member FROM sync WHERE meta_message = ?", (meta_identity.database_id,)))
                 if not len(A) == len(B):
                     raise ValueError("inconsistent dispersy-identity messages.", A.difference(B))
 
@@ -1931,7 +1931,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                 meta_undo_other = community.get_meta_message(u"dispersy-undo-other")
 
                 # TODO we are not taking into account that undo messages can be undone
-                for undo_packet_id, undo_packet_global_time, undo_packet in select(u"SELECT id, global_time, packet FROM sync WHERE community = ? AND meta_message = ? ORDER BY id LIMIT ? OFFSET ?", (community.database_id, meta_undo_other.database_id)):
+                for undo_packet_id, undo_packet_global_time, undo_packet in fetchall(u"SELECT id, global_time, packet FROM sync WHERE community = ? AND meta_message = ? ORDER BY id LIMIT ? OFFSET ?", (community.database_id, meta_undo_other.database_id)):
                     undo_packet = str(undo_packet)
                     undo_message = self.convert_packet_to_message(undo_packet, community, verify=False)
 
@@ -1979,7 +1979,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
             # ensure all packets in the database are valid and that the binary packets are consistent
             # with the information stored in the database
             #
-            for packet_id, member_id, global_time, meta_message_id, packet in select(u"SELECT id, member, global_time, meta_message, packet FROM sync WHERE community = ? ORDER BY id LIMIT ? OFFSET ?", (community.database_id,)):
+            for packet_id, member_id, global_time, meta_message_id, packet in fetchall(u"SELECT id, member, global_time, meta_message, packet FROM sync WHERE community = ? ORDER BY id LIMIT ? OFFSET ?", (community.database_id,)):
                 if meta_message_id in enabled_messages:
                     packet = str(packet)
                     message = self.convert_packet_to_message(packet, community, verify=True)
@@ -2013,7 +2013,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                     counter = 0
                     counter_member_id = 0
                     exception = None
-                    for packet_id, member_id, packet in select(u"SELECT id, member, packet FROM sync WHERE meta_message = ? ORDER BY member, global_time LIMIT ? OFFSET ?", (meta.database_id,)):
+                    for packet_id, member_id, packet in fetchall(u"SELECT id, member, packet FROM sync WHERE meta_message = ? ORDER BY member, global_time LIMIT ? OFFSET ?", (meta.database_id,)):
                         packet = str(packet)
                         message = self.convert_packet_to_message(packet, community, verify=False)
                         assert message
@@ -2047,7 +2047,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                     if isinstance(meta.authentication, MemberAuthentication):
                         counter = 0
                         counter_member_id = 0
-                        for packet_id, member_id, packet in select(u"SELECT id, member, packet FROM sync WHERE meta_message = ? ORDER BY member ASC, global_time DESC LIMIT ? OFFSET ?", (meta.database_id,)):
+                        for packet_id, member_id, packet in fetchall(u"SELECT id, member, packet FROM sync WHERE meta_message = ? ORDER BY member ASC, global_time DESC LIMIT ? OFFSET ?", (meta.database_id,)):
                             message = self.convert_packet_to_message(str(packet), community, verify=False)
                             assert message
 
@@ -2064,7 +2064,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
                     else:
                         assert isinstance(meta.authentication, DoubleMemberAuthentication)
-                        for packet_id, member_id, packet in select(u"SELECT id, member, packet FROM sync WHERE meta_message = ? ORDER BY member ASC, global_time DESC LIMIT ? OFFSET ?", (meta.database_id,)):
+                        for packet_id, member_id, packet in fetchall(u"SELECT id, member, packet FROM sync WHERE meta_message = ? ORDER BY member ASC, global_time DESC LIMIT ? OFFSET ?", (meta.database_id,)):
                             message = self.convert_packet_to_message(str(packet), community, verify=False)
                             assert message
 
