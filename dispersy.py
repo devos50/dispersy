@@ -1612,10 +1612,10 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                             items.update(all_items[:len(all_items) - meta.distribution.history_size])
 
             if items:
-                self._database.executemany(u"DELETE FROM sync WHERE id = ?", [(syncid,) for syncid, _ in items])
+                self._database.stormdb.executemany(u"DELETE FROM sync WHERE id = ?", [(syncid,) for syncid, _ in items])
 
                 if is_double_member_authentication:
-                    self._database.executemany(u"DELETE FROM double_signed_sync WHERE sync = ?", [(syncid,) for syncid, _ in items])
+                    self._database.stormdb.executemany(u"DELETE FROM double_signed_sync WHERE sync = ?", [(syncid,) for syncid, _ in items])
 
                 # update_sync_range.update(global_time for _, _, global_time in items)
 
