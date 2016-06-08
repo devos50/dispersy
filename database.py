@@ -128,9 +128,9 @@ class Database(object):
         assert self._connection is not None, "Database.close() has been called or Database.open() has not been called"
 
         # collect current database configuration
-        page_size = int(next(self._cursor.execute(u"PRAGMA page_size"))[0])
-        journal_mode = unicode(next(self._cursor.execute(u"PRAGMA journal_mode"))[0]).upper()
-        synchronous = unicode(next(self._cursor.execute(u"PRAGMA synchronous"))[0]).upper()
+        page_size = int(self.stormdb.fetchone(u"PRAGMA page_size")[0])
+        journal_mode = unicode(self.stormdb.fetchone(u"PRAGMA journal_mode")[0]).upper()
+        synchronous = unicode(self.stormdb.fetchone(u"PRAGMA synchronous")[0]).upper()
 
         #
         # PRAGMA page_size = bytes;
@@ -144,11 +144,10 @@ class Database(object):
 
             # it is not possible to change page_size when WAL is enabled
             if journal_mode == u"WAL":
-                self._cursor.executescript(u"PRAGMA journal_mode = DELETE")
+                self.stormdb.execute(u"PRAGMA journal_mode = DELETE")
                 journal_mode = u"DELETE"
-            self._cursor.execute(u"PRAGMA page_size = 8192")
-            self._cursor.execute(u"VACUUM")
-            page_size = 8192
+                self.stormdb.execute(u"PRAGMA page_size = 8192")
+                self.stormdb.execute(u"VACUUM")
 
         else:
             self._logger.debug("PRAGMA page_size = %s (no change) [%s]", page_size, self._file_path)
@@ -159,8 +158,8 @@ class Database(object):
         #
         if not (journal_mode == u"WAL" or self._file_path == u":memory:"):
             self._logger.debug("PRAGMA journal_mode = WAL (previously: %s) [%s]", journal_mode, self._file_path)
-            self._cursor.execute(u"PRAGMA locking_mode = EXCLUSIVE")
-            self._cursor.execute(u"PRAGMA journal_mode = WAL")
+            self.stormdb.execute(u"PRAGMA locking_mode = EXCLUSIVE")
+            self.stormdb.execute(u"PRAGMA journal_mode = WAL")
 
         else:
             self._logger.debug("PRAGMA journal_mode = %s (no change) [%s]", journal_mode, self._file_path)
@@ -171,7 +170,7 @@ class Database(object):
         #
         if not synchronous in (u"NORMAL", u"1"):
             self._logger.debug("PRAGMA synchronous = NORMAL (previously: %s) [%s]", synchronous, self._file_path)
-            self._cursor.execute(u"PRAGMA synchronous = NORMAL")
+            self.stormdb.execute(u"PRAGMA synchronous = NORMAL")
 
         else:
             self._logger.debug("PRAGMA synchronous = %s (no change) [%s]", synchronous, self._file_path)
