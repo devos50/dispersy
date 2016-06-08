@@ -78,8 +78,10 @@ class TestClassification(DispersyTestFunc):
         master = self._dispersy.get_new_member(u"high")
 
         # create one community
-        self._dispersy.database.execute(u"INSERT INTO community (master, member, classification) VALUES (?, ?, ?)",
-                                        (master.database_id, self._mm._my_member.database_id, ClassificationLoadOneCommunities.get_classification()))
+        self._dispersy.database.stormdb.insert(u"community",
+                                               master=master.database_id,
+                                               member=self._mm.my_member.database_id,
+                                               classification=ClassificationLoadOneCommunities.get_classification())
 
         # load one community
         communities = [ClassificationLoadOneCommunities(self._dispersy, master, self._mm._my_member)
