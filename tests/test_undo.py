@@ -119,7 +119,7 @@ class TestUndo(DispersyTestFunc):
                 self._logger.debug("loop%d", len(x))
 
         def fetch_all_messages():
-            for row in  list(other._dispersy.database.execute(u"SELECT * FROM sync")):
+            for row in other._dispersy.database.stormdb.fetchall(u"SELECT * FROM sync"):
                 self._logger.debug("_______ %s", row)
         other.call(fetch_all_messages)
 
