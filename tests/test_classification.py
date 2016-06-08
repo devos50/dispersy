@@ -21,17 +21,19 @@ class TestClassification(DispersyTestFunc):
         master = self._dispersy.get_new_member(u"high")
 
         # create community
-        self._dispersy.database.execute(u"INSERT INTO community (master, member, classification) VALUES (?, ?, ?)",
-                                        (master.database_id, self._mm.my_member.database_id, ClassTestA.get_classification()))
+        self._dispersy.database.stormdb.insert(u"community",
+                                               master=master.database_id,
+                                               member=self._mm.my_member.database_id,
+                                               classification=ClassTestA.get_classification())
 
         # reclassify
         community = self._dispersy.reclassify_community(master, ClassTestB)
         self.assertIsInstance(community, ClassTestB)
         self.assertEqual(community.cid, master.mid)
         try:
-            classification, = self._dispersy.database.execute(u"SELECT classification FROM community WHERE master = ?",
-                                                              (master.database_id,)).next()
-        except StopIteration:
+            classification, = self._dispersy.database.stormdb.fetchone(u"SELECT classification FROM community WHERE master = ?",
+                                                              (master.database_id,))
+        except TypeError:
             self.fail()
         self.assertEqual(classification, ClassTestB.get_classification())
 
