@@ -41,6 +41,9 @@ class StormDBManager:
         self._version = 0
         self._retrieve_version()
 
+    @property
+    def version(self):
+        return self._version
 
     def _retrieve_version(self):
         """
