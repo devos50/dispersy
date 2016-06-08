@@ -50,8 +50,8 @@ class TestClassification(DispersyTestFunc):
 
         # create community
         community_c = ClassTestC.create_community(self._dispersy, self._mm._my_member)
-        self.assertEqual(len(list(self._dispersy.database.execute(u"SELECT * FROM community WHERE classification = ?",
-                                                                  (ClassTestC.get_classification(),)))), 1)
+        self.assertEqual(self._dispersy.database.stormdb.fetchone(u"SELECT COUNT(*) FROM community WHERE classification = ?",
+                                                                  (ClassTestC.get_classification(),))[0], 1)
 
         # reclassify
         community_d = self._dispersy.reclassify_community(community_c, ClassTestD)
@@ -59,9 +59,9 @@ class TestClassification(DispersyTestFunc):
         self.assertEqual(community_c.cid, community_d.cid)
 
         try:
-            classification, = self._dispersy.database.execute(u"SELECT classification FROM community WHERE master = ?",
-                                                              (community_c.master_member.database_id,)).next()
-        except StopIteration:
+            classification, = self._dispersy.database.stormdb.fetchone(u"SELECT classification FROM community WHERE master = ?",
+                                                              (community_c.master_member.database_id,))
+        except TypeError:
             self.fail()
         self.assertEqual(classification, ClassTestD.get_classification())
 
