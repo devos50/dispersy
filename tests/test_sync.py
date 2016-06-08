@@ -261,14 +261,14 @@ class TestSync(DispersyTestFunc):
         def check_database_contents():
             # TODO(emilon): This could be done better.
             def fetch_rows():
-                return list(nodeA._dispersy.database.execute(
+                return nodeA._dispersy.database.stormdb.fetchall(
                     u"SELECT sync.global_time, sync.member, double_signed_sync.member1, double_signed_sync.member2, "
                     u"member1.mid as mid1, member2.mid as mid2 FROM sync "
                     u"JOIN double_signed_sync ON double_signed_sync.sync = sync.id "
                     u"JOIN member member1 ON double_signed_sync.member1 = member1.id "
                     u"JOIN member member2 ON double_signed_sync.member2 = member2.id "
                     u"WHERE sync.community = ? AND sync.member = ? AND sync.meta_message = ?",
-                    (nodeA._community.database_id, nodeA.my_member.database_id, message.database_id)))
+                    (nodeA._community.database_id, nodeA.my_member.database_id, message.database_id))
 
             entries = []
             database_ids = {}
