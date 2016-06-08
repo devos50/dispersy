@@ -124,7 +124,7 @@ class TrackerCommunity(Community):
         write("# received dispersy-destroy-community from %s\n" % (str(message.candidate),))
 
         identity_id = self._meta_messages[u"dispersy-identity"].database_id
-        execute = self._dispersy.database.execute
+        fetchone = self._dispersy.database.stormdb.fetchone
         messages = [message]
         stored = set()
         while messages:
@@ -136,9 +136,9 @@ class TrackerCommunity(Community):
 
                 if not message.authentication.member.public_key in stored:
                     try:
-                        packet, = execute(u"SELECT packet FROM sync WHERE meta_message = ? AND member = ?", (
-                            identity_id, message.authentication.member.database_id)).next()
-                    except StopIteration:
+                        packet, = fetchone(u"SELECT packet FROM sync WHERE meta_message = ? AND member = ?", (
+                            identity_id, message.authentication.member.database_id))
+                    except TypeError:
                         pass
                     else:
                         write(" ".join(("dispersy-identity", str(packet).encode("HEX"), "\n")))
