@@ -181,15 +181,15 @@ class Database(object):
 
         # check is the database contains an 'option' table
         try:
-            count, = next(self.execute(u"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'option'"))
-        except StopIteration:
+            count, = self.stormdb.fetchone(u"SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'option'")
+        except TypeError:
             raise RuntimeError()
 
         if count:
             # get version from required 'option' table
             try:
-                version, = next(self.execute(u"SELECT value FROM option WHERE key == 'database_version' LIMIT 1"))
-            except StopIteration:
+                version, = self.stormdb.fetchone(u"SELECT value FROM option WHERE key == 'database_version' LIMIT 1")
+            except TypeError:
                 # the 'database_version' key was not found
                 version = u"0"
         else:
