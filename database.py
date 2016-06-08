@@ -9,7 +9,6 @@ import logging
 import sys
 import thread
 from abc import ABCMeta, abstractmethod
-from sqlite3 import Connection
 
 from StormDBManager import StormDBManager
 from .util import attach_runtime_statistics
@@ -25,7 +24,7 @@ if "--explain-query-plan" in getattr(sys, "argv", []):
                 _explain_query_plan.add(statements)
 
                 _explain_query_plan_logger.info("Explain query plan for <<<%s>>>", statements)
-                for line in self._cursor.execute(u"EXPLAIN QUERY PLAN %s" % statements, bindings):
+                for line in self.stormdb.fetchall(u"EXPLAIN QUERY PLAN %s" % statements, bindings):
                     _explain_query_plan_logger.info(line)
                 _explain_query_plan_logger.info("--")
 
