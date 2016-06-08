@@ -304,11 +304,11 @@ class DebugNode(object):
     @blocking_call_on_reactor_thread
     def fetch_packets(self, message_names, mid=None):
         if mid:
-            return [str(packet) for packet, in list(self._dispersy.database.execute(u"SELECT packet FROM sync, member WHERE sync.member = member.id "
+            return [str(packet) for packet, in self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync, member WHERE sync.member = member.id "
                                                                                     u"AND mid = ? AND meta_message IN (" + ", ".join("?" * len(message_names)) + ") ORDER BY global_time, packet",
-                                                                                [buffer(mid), ] + [self._community.get_meta_message(name).database_id for name in message_names]))]
-        return [str(packet) for packet, in list(self._dispersy.database.execute(u"SELECT packet FROM sync WHERE meta_message IN (" + ", ".join("?" * len(message_names)) + ") ORDER BY global_time, packet",
-                                                                                [self._community.get_meta_message(name).database_id for name in message_names]))]
+                                                                                [buffer(mid), ] + [self._community.get_meta_message(name).database_id for name in message_names])]
+        return [str(packet) for packet, in self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync WHERE meta_message IN (" + ", ".join("?" * len(message_names)) + ") ORDER BY global_time, packet",
+                                                                                [self._community.get_meta_message(name).database_id for name in message_names])]
 
     @blocking_call_on_reactor_thread
     def fetch_messages(self, message_names, mid=None):
