@@ -320,7 +320,7 @@ class DebugNode(object):
 
     @blocking_call_on_reactor_thread
     def count_messages(self, message):
-        packets_stored, = self._dispersy.database.execute(u"SELECT count(*) FROM sync, member, meta_message WHERE sync.member = member.id AND sync.meta_message = meta_message.id AND sync.community = ? AND mid = ? AND name = ?", (self._community.database_id, buffer(message.authentication.member.mid), message.name)).next()
+        packets_stored, = self._dispersy.database.stormdb.fetchone(u"SELECT count(*) FROM sync, member, meta_message WHERE sync.member = member.id AND sync.meta_message = meta_message.id AND sync.community = ? AND mid = ? AND name = ?", (self._community.database_id, buffer(message.authentication.member.mid), message.name))
         return packets_stored
 
     @blocking_call_on_reactor_thread
