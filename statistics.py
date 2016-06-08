@@ -199,7 +199,7 @@ class DispersyStatistics(Statistics):
 
     @property
     def database_version(self):
-        return self._dispersy.database.database_version
+        return self._dispersy.database.stormdb.version
 
     @property
     def lan_address(self):
@@ -350,7 +350,7 @@ class CommunityStatistics(Statistics):
 
     def update(self, database=False):
         if database:
-            self.database = dict(self._community.dispersy.database.execute(u"SELECT meta_message.name, COUNT(sync.id) FROM sync JOIN meta_message ON meta_message.id = sync.meta_message WHERE sync.community = ? GROUP BY sync.meta_message", (self._community.database_id,)))
+            self.database = dict(self._community.dispersy.database.stormdb.fetchall(u"SELECT meta_message.name, COUNT(sync.id) FROM sync JOIN meta_message ON meta_message.id = sync.meta_message WHERE sync.community = ? GROUP BY sync.meta_message", (self._community.database_id,)))
         else:
             self.database = dict()
 
