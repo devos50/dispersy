@@ -345,11 +345,11 @@ class DebugNode(object):
 
         for message in messages:
             try:
-                packet, = self._dispersy.database.execute(u"SELECT packet FROM sync, member WHERE sync.member = member.id AND community = ? AND mid = ? AND global_time = ?",
-                                                         (self._community.database_id, buffer(message.authentication.member.mid), message.distribution.global_time)).next()
+                packet, = self._dispersy.database.stormdb.fetchone(u"SELECT packet FROM sync, member WHERE sync.member = member.id AND community = ? AND mid = ? AND global_time = ?",
+                                                         (self._community.database_id, buffer(message.authentication.member.mid), message.distribution.global_time))
 
                 self._testclass.assertNotEqual(str(packet), message.packet)
-            except StopIteration:
+            except TypeError:
                 pass
 
     assert_is_done = assert_is_stored
