@@ -361,16 +361,16 @@ class DebugNode(object):
 
         for message in messages:
             try:
-                undone, = self._dispersy.database.execute(u"SELECT undone FROM sync, member WHERE sync.member = member.id AND community = ? AND mid = ? AND global_time = ?",
-                                                         (self._community.database_id, buffer(message.authentication.member.mid), message.distribution.global_time)).next()
+                undone, = self._dispersy.database.stormdb.fetchone(u"SELECT undone FROM sync, member WHERE sync.member = member.id AND community = ? AND mid = ? AND global_time = ?",
+                                                         (self._community.database_id, buffer(message.authentication.member.mid), message.distribution.global_time))
                 self._testclass.assertGreater(undone, 0, "Message is not undone")
                 if undone_by:
-                    undone, = self._dispersy.database.execute(
+                    undone, = self._dispersy.database.stormdb.fetchone(
                         u"SELECT packet FROM sync WHERE id = ? ",
-                        (undone,)).next()
+                        (undone,))
                     self._testclass.assertEqual(str(undone), undone_by.packet)
 
-            except StopIteration:
+            except TypeError:
                 self._testclass.fail("Message is not stored")
 
     @blocking_call_on_reactor_thread
