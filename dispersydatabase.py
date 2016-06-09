@@ -166,57 +166,56 @@ class DispersyDatabase(Database):
                 self.commit()
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 19)
 
-                # Upgrade from 19 to 20
-                if database_version < 20:
-                    # Let's store the sequence numbers in the database instead of quessing
-                    self._logger.debug("upgrade database %d -> %d", database_version, 20)
+            # Upgrade from 19 to 20
+            if database_version < 20:
+                # Let's store the sequence numbers in the database instead of quessing
+                self._logger.debug("upgrade database %d -> %d", database_version, 20)
 
-                self.executescript(u"""
-DROP INDEX IF EXISTS sync_meta_message_undone_global_time_index;
-DROP INDEX IF EXISTS sync_meta_message_member;
-""")
-                old_sync = list(self.execute(u"""
-                    SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'old_sync';"""))
+                self.stormdb.executescript([
+                    u""" DROP INDEX IF EXISTS sync_meta_message_undone_global_time_index;""",
+                    u"""DROP INDEX IF EXISTS sync_meta_message_member;"""])
+
+                old_sync = self.stormdb.fetchall(u"""
+                    SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'old_sync';""")
                 if old_sync:
                     # delete the sync table and start copying data again
-                    self.executescript(u"""
-DROP TABLE IF EXISTS sync;
-DROP INDEX IF EXISTS sync_meta_message_undone_global_time_index;
-DROP INDEX IF EXISTS sync_meta_message_member;
-""")
+                    self.stormdb.executescript([
+                        u"""DROP TABLE IF EXISTS sync;""",
+                        u"""DROP INDEX IF EXISTS sync_meta_message_undone_global_time_index;""",
+                        u"""DROP INDEX IF EXISTS sync_meta_message_member;"""])
                 else:
                     # rename sync to old_sync if it is the first time
-                    self.executescript(u"ALTER TABLE sync RENAME TO old_sync;")
+                    self.stormdb.execute(u"ALTER TABLE sync RENAME TO old_sync;")
 
-                self.executescript(u"""
-CREATE TABLE IF NOT EXISTS sync(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    community INTEGER REFERENCES community(id),
-    member INTEGER REFERENCES member(id),                  -- the creator of the message
-    global_time INTEGER,
-    meta_message INTEGER REFERENCES meta_message(id),
-    undone INTEGER DEFAULT 0,
-    packet BLOB,
-    sequence INTEGER,
-    UNIQUE(community, member, global_time, sequence));
+                    self.executescript(u"""
+    CREATE TABLE IF NOT EXISTS sync(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        community INTEGER REFERENCES community(id),
+        member INTEGER REFERENCES member(id),                  -- the creator of the message
+        global_time INTEGER,
+        meta_message INTEGER REFERENCES meta_message(id),
+        undone INTEGER DEFAULT 0,
+        packet BLOB,
+        sequence INTEGER,
+        UNIQUE(community, member, global_time, sequence));
 
-CREATE INDEX sync_meta_message_undone_global_time_index ON sync(meta_message, undone, global_time);
-CREATE INDEX sync_meta_message_member ON sync(meta_message, member);
+    CREATE INDEX sync_meta_message_undone_global_time_index ON sync(meta_message, undone, global_time);
+    CREATE INDEX sync_meta_message_member ON sync(meta_message, member);
 
-INSERT INTO sync  (id, community, member, global_time, meta_message, undone, packet, sequence)
-    SELECT id, community, member, global_time, meta_message, undone, packet, NULL FROM old_sync;
+    INSERT INTO sync  (id, community, member, global_time, meta_message, undone, packet, sequence)
+        SELECT id, community, member, global_time, meta_message, undone, packet, NULL FROM old_sync;
 
-DROP TABLE IF EXISTS old_sync;
+    DROP TABLE IF EXISTS old_sync;
 
-UPDATE option SET value = '20' WHERE key = 'database_version';
-""")
+    UPDATE option SET value = '20' WHERE key = 'database_version';
+    """)
                 self.commit()
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 20)
 
-                # Upgrade from 20 to 21
-                if database_version < 21:
-                    # remove 'cluster' column from meta_message table
-                    self._logger.debug("upgrade database %d -> %d", database_version, 21)
+            # Upgrade from 20 to 21
+            if database_version < 21:
+                # remove 'cluster' column from meta_message table
+                self._logger.debug("upgrade database %d -> %d", database_version, 21)
                 self.executescript(u"""
 CREATE TABLE meta_message_new(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
