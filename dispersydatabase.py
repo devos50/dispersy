@@ -58,58 +58,6 @@ schema = [
     U"""INSERT INTO option(key, value) VALUES('database_version', '""" + str(LATEST_VERSION) + u"""');"""
 
 ]
-schema = u"""
-CREATE TABLE member(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- mid BLOB,                                      -- member identifier (sha1 of public_key)
- public_key BLOB,                               -- member public key
- private_key BLOB);                             -- member private key
-CREATE INDEX member_mid_index ON member(mid);
-
-CREATE TABLE community(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- master INTEGER REFERENCES member(id),          -- master member (permission tree root)
- member INTEGER REFERENCES member(id),          -- my member (used to sign messages)
- classification TEXT,                           -- community type, typically the class name
- auto_load BOOL DEFAULT 1,                      -- when 1 this community is loaded whenever a packet for it is received
- database_version INTEGER DEFAULT """ + str(LATEST_VERSION) + u""",
- UNIQUE(master));
-
-CREATE TABLE meta_message(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- community INTEGER REFERENCES community(id),
- name TEXT,
- priority INTEGER DEFAULT 128,
- direction INTEGER DEFAULT 1,                           -- direction used when synching (1 for ASC, -1 for DESC)
- UNIQUE(community, name));
-
---CREATE TABLE reference_member_sync(
--- member INTEGER REFERENCES member(id),
--- sync INTEGER REFERENCES sync(id),
--- UNIQUE(member, sync));
-
-CREATE TABLE double_signed_sync(
- sync INTEGER REFERENCES sync(id),
- member1 INTEGER REFERENCES member(id),
- member2 INTEGER REFERENCES member(id));
-CREATE INDEX double_signed_sync_index_0 ON double_signed_sync(member1, member2);
-
-CREATE TABLE sync(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- community INTEGER REFERENCES community(id),
- member INTEGER REFERENCES member(id),                  -- the creator of the message
- global_time INTEGER,
- meta_message INTEGER REFERENCES meta_message(id),
- undone INTEGER DEFAULT 0,
- packet BLOB,
- sequence INTEGER,
- UNIQUE(community, member, global_time));
-CREATE INDEX sync_meta_message_undone_global_time_index ON sync(meta_message, undone, global_time);
-CREATE INDEX sync_meta_message_member ON sync(meta_message, member);
-
-CREATE TABLE option(key TEXT PRIMARY KEY, value BLOB);
-INSERT INTO option(key, value) VALUES('database_version', '""" + str(LATEST_VERSION) + u"""');
-"""
 
 
 class DispersyDatabase(Database):
@@ -124,8 +72,7 @@ class DispersyDatabase(Database):
 
         if database_version == 0:
             # setup new database with current database_version
-            self.executescript(schema)
-            self.commit()
+            self.stormdb.executescript(schema)
 
         else:
             # Check if the version is not higher than
@@ -144,25 +91,23 @@ class DispersyDatabase(Database):
                 # Member instances.  unfortunately this requires the removal of the UNIQUE clause,
                 # however, the python code already guarantees that the public_key remains unique.
                 self._logger.info("upgrade database %d -> %d", database_version, 17)
-                self.executescript(u"""
--- move / remove old member table
-DROP INDEX IF EXISTS member_mid_index;
-ALTER TABLE member RENAME TO old_member;
--- create new member table
-CREATE TABLE member(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- mid BLOB,                                      -- member identifier (sha1 of public_key)
- public_key BLOB,                               -- member public key
- tags TEXT DEFAULT '');                         -- comma separated tags: store, ignore, and blacklist
-CREATE INDEX member_mid_index ON member(mid);
--- fill new member table with old data
-INSERT INTO member (id, mid, public_key, tags) SELECT id, mid, public_key, tags FROM old_member;
--- remove old member table
-DROP TABLE old_member;
--- update database version
-UPDATE option SET value = '17' WHERE key = 'database_version';
-""")
-                self.commit()
+                self.stormdb.executescript([u"""
+                                              -- move / remove old member table
+                                              DROP INDEX IF EXISTS member_mid_index;""",
+                                            u"""ALTER TABLE member RENAME TO old_member;""",
+                                            u"""-- create new member table
+                                             CREATE TABLE member(
+                                              id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                              mid BLOB,                                      -- member identifier (sha1 of public_key)
+                                              public_key BLOB,                               -- member public key
+                                              tags TEXT DEFAULT '');                         -- comma separated tags: store, ignore, and blacklist""",
+                                            u"""CREATE INDEX member_mid_index ON member(mid);""",
+                                            u"""-- fill new member table with old data
+                                              INSERT INTO member (id, mid, public_key, tags) SELECT id, mid, public_key, tags FROM old_member;""",
+                                            u"""-- remove old member table
+                                              DROP TABLE old_member;""",
+                                            u"""-- update database version
+                                              UPDATE option SET value = '17' WHERE key = 'database_version';"""])
                 self._logger.info("upgrade database %d -> %d (done)", database_version, 17)
 
             # upgrade from version 17 to version 18
