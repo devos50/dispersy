@@ -133,7 +133,6 @@ class DispersyDatabase(Database):
                     u"""-- update database version
                       UPDATE option SET value = '18' WHERE key = 'database_version';""",
                 ])
-                self.commit()
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 18)
 
             # upgrade from version 18 to version 19
@@ -163,7 +162,6 @@ class DispersyDatabase(Database):
                       DROP TABLE IF EXISTS private_key;""",
                     u"""-- update database version
                       UPDATE option SET value = '19' WHERE key = 'database_version';"""])
-                self.commit()
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 19)
 
             # Upgrade from 19 to 20
@@ -187,52 +185,42 @@ class DispersyDatabase(Database):
                     # rename sync to old_sync if it is the first time
                     self.stormdb.execute(u"ALTER TABLE sync RENAME TO old_sync;")
 
-                    self.executescript(u"""
-    CREATE TABLE IF NOT EXISTS sync(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        community INTEGER REFERENCES community(id),
-        member INTEGER REFERENCES member(id),                  -- the creator of the message
-        global_time INTEGER,
-        meta_message INTEGER REFERENCES meta_message(id),
-        undone INTEGER DEFAULT 0,
-        packet BLOB,
-        sequence INTEGER,
-        UNIQUE(community, member, global_time, sequence));
-
-    CREATE INDEX sync_meta_message_undone_global_time_index ON sync(meta_message, undone, global_time);
-    CREATE INDEX sync_meta_message_member ON sync(meta_message, member);
-
-    INSERT INTO sync  (id, community, member, global_time, meta_message, undone, packet, sequence)
-        SELECT id, community, member, global_time, meta_message, undone, packet, NULL FROM old_sync;
-
-    DROP TABLE IF EXISTS old_sync;
-
-    UPDATE option SET value = '20' WHERE key = 'database_version';
-    """)
-                self.commit()
+                    self.stormdb.executescript([
+                        u"""CREATE TABLE IF NOT EXISTS sync(
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            community INTEGER REFERENCES community(id),
+                            member INTEGER REFERENCES member(id),                  -- the creator of the message
+                            global_time INTEGER,
+                            meta_message INTEGER REFERENCES meta_message(id),
+                            undone INTEGER DEFAULT 0,
+                            packet BLOB,
+                            sequence INTEGER,
+                            UNIQUE(community, member, global_time, sequence));""",
+                        u"""CREATE INDEX sync_meta_message_undone_global_time_index ON sync(meta_message, undone, global_time);""",
+                        u"""CREATE INDEX sync_meta_message_member ON sync(meta_message, member);""",
+                        u"""INSERT INTO sync  (id, community, member, global_time, meta_message, undone, packet, sequence)
+                        SELECT id, community, member, global_time, meta_message, undone, packet, NULL FROM old_sync;""",
+                        u"""DROP TABLE IF EXISTS old_sync;""",
+                        u"""UPDATE option SET value = '20' WHERE key = 'database_version';"""])
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 20)
 
             # Upgrade from 20 to 21
             if database_version < 21:
                 # remove 'cluster' column from meta_message table
                 self._logger.debug("upgrade database %d -> %d", database_version, 21)
-                self.executescript(u"""
-CREATE TABLE meta_message_new(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- community INTEGER REFERENCES community(id),
- name TEXT,
- priority INTEGER DEFAULT 128,
- direction INTEGER DEFAULT 1,                           -- direction used when synching (1 for ASC, -1 for DESC)
- UNIQUE(community, name));
-
-INSERT INTO meta_message_new(id, community, name, priority, direction)
-  SELECT id, community, name, priority, direction FROM meta_message ORDER BY id;
-
-DROP TABLE meta_message;
-ALTER TABLE meta_message_new RENAME TO meta_message;
-
-UPDATE option SET value = '21' WHERE key = 'database_version';""")
-                self.commit()
+                self.stormdb.executescript([
+                    u"""CREATE TABLE meta_message_new(
+                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                     community INTEGER REFERENCES community(id),
+                     name TEXT,
+                     priority INTEGER DEFAULT 128,
+                     direction INTEGER DEFAULT 1,                           -- direction used when synching (1 for ASC, -1 for DESC)
+                     UNIQUE(community, name));""",
+                    u"""INSERT INTO meta_message_new(id, community, name, priority, direction)
+                      SELECT id, community, name, priority, direction FROM meta_message ORDER BY id;""",
+                    u"""DROP TABLE meta_message;""",
+                    u"""ALTER TABLE meta_message_new RENAME TO meta_message;""",
+                    u"""UPDATE option SET value = '21' WHERE key = 'database_version';"""])
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 21)
 
         return LATEST_VERSION
