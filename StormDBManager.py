@@ -118,6 +118,20 @@ class StormDBManager:
         for item in list:
             self.execute(query, item)
 
+    def executescript(self, sql_statements):
+        """
+        Executes a script of several sql queries sequentially.
+        Note that this function does exist in SQLite, but not in the storm framework:
+        https://www.mail-archive.com/storm@lists.canonical.com/msg00569.html
+        Args:
+            sql_statements: A list of sql statements to be executed.
+
+        Returns: None
+
+        """
+        for sql_statement in sql_statements:
+            self.connection.execute(sql_statement)
+
     def fetchone(self, query, arguments=None):
         """
         Executes a query on the twisted thread-pool using the storm framework and returns the first result.
