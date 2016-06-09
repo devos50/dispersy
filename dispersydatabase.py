@@ -11,9 +11,53 @@ from itertools import groupby
 from .database import Database
 from .distribution import FullSyncDistribution
 
-
 LATEST_VERSION = 21
 
+schema = [
+    u"""
+    CREATE TABLE member(
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     mid BLOB,                                      -- member identifier (sha1 of public_key)
+     public_key BLOB,                               -- member public key
+     private_key BLOB);                             -- member private key
+     """,
+    u"""CREATE INDEX member_mid_index ON member(mid);""",
+    u"""CREATE TABLE community(
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     master INTEGER REFERENCES member(id),          -- master member (permission tree root)
+     member INTEGER REFERENCES member(id),          -- my member (used to sign messages)
+     classification TEXT,                           -- community type, typically the class name
+     auto_load BOOL DEFAULT 1,                      -- when 1 this community is loaded whenever a packet for it is received
+     database_version INTEGER DEFAULT """ + str(LATEST_VERSION) + u""",
+     UNIQUE(master));""",
+    u"""CREATE TABLE meta_message(
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     community INTEGER REFERENCES community(id),
+     name TEXT,
+     priority INTEGER DEFAULT 128,
+     direction INTEGER DEFAULT 1,                           -- direction used when synching (1 for ASC, -1 for DESC)
+     UNIQUE(community, name));""",
+    u"""CREATE TABLE double_signed_sync(
+     sync INTEGER REFERENCES sync(id),
+     member1 INTEGER REFERENCES member(id),
+     member2 INTEGER REFERENCES member(id));""",
+    u"""CREATE INDEX double_signed_sync_index_0 ON double_signed_sync(member1, member2);""",
+    u"""CREATE TABLE sync(
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     community INTEGER REFERENCES community(id),
+     member INTEGER REFERENCES member(id),                  -- the creator of the message
+     global_time INTEGER,
+     meta_message INTEGER REFERENCES meta_message(id),
+     undone INTEGER DEFAULT 0,
+     packet BLOB,
+     sequence INTEGER,
+     UNIQUE(community, member, global_time));""",
+    u"""CREATE INDEX sync_meta_message_undone_global_time_index ON sync(meta_message, undone, global_time);""",
+    u"""CREATE INDEX sync_meta_message_member ON sync(meta_message, member);""",
+    u"""CREATE TABLE option(key TEXT PRIMARY KEY, value BLOB);""",
+    U"""INSERT INTO option(key, value) VALUES('database_version', '""" + str(LATEST_VERSION) + u"""');"""
+
+]
 schema = u"""
 CREATE TABLE member(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
