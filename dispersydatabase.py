@@ -28,7 +28,7 @@ CREATE TABLE community(
  member INTEGER REFERENCES member(id),          -- my member (used to sign messages)
  classification TEXT,                           -- community type, typically the class name
  auto_load BOOL DEFAULT 1,                      -- when 1 this community is loaded whenever a packet for it is received
- database_version INTEGER DEFAULT """ + str(LATEST_VERSION) + """,
+ database_version INTEGER DEFAULT """ + str(LATEST_VERSION) + u""",
  UNIQUE(master));
 
 CREATE TABLE meta_message(
@@ -64,7 +64,7 @@ CREATE INDEX sync_meta_message_undone_global_time_index ON sync(meta_message, un
 CREATE INDEX sync_meta_message_member ON sync(meta_message, member);
 
 CREATE TABLE option(key TEXT PRIMARY KEY, value BLOB);
-INSERT INTO option(key, value) VALUES('database_version', '""" + str(LATEST_VERSION) + """');
+INSERT INTO option(key, value) VALUES('database_version', '""" + str(LATEST_VERSION) + u"""');
 """
 
 
