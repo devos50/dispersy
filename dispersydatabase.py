@@ -91,48 +91,48 @@ class DispersyDatabase(Database):
                 # Member instances.  unfortunately this requires the removal of the UNIQUE clause,
                 # however, the python code already guarantees that the public_key remains unique.
                 self._logger.info("upgrade database %d -> %d", database_version, 17)
-                self.stormdb.executescript([u"""
-                                              -- move / remove old member table
-                                              DROP INDEX IF EXISTS member_mid_index;""",
-                                            u"""ALTER TABLE member RENAME TO old_member;""",
-                                            u"""-- create new member table
-                                             CREATE TABLE member(
-                                              id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                              mid BLOB,                                      -- member identifier (sha1 of public_key)
-                                              public_key BLOB,                               -- member public key
-                                              tags TEXT DEFAULT '');                         -- comma separated tags: store, ignore, and blacklist""",
-                                            u"""CREATE INDEX member_mid_index ON member(mid);""",
-                                            u"""-- fill new member table with old data
-                                              INSERT INTO member (id, mid, public_key, tags) SELECT id, mid, public_key, tags FROM old_member;""",
-                                            u"""-- remove old member table
-                                              DROP TABLE old_member;""",
-                                            u"""-- update database version
-                                              UPDATE option SET value = '17' WHERE key = 'database_version';"""])
+                self.stormdb.executescript([
+                    u"""-- move / remove old member table
+                      DROP INDEX IF EXISTS member_mid_index;""",
+                    u"""ALTER TABLE member RENAME TO old_member;""",
+                    u"""-- create new member table
+                     CREATE TABLE member(
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      mid BLOB,                                      -- member identifier (sha1 of public_key)
+                      public_key BLOB,                               -- member public key
+                      tags TEXT DEFAULT '');                         -- comma separated tags: store, ignore, and blacklist""",
+                    u"""CREATE INDEX member_mid_index ON member(mid);""",
+                    u"""-- fill new member table with old data
+                      INSERT INTO member (id, mid, public_key, tags) SELECT id, mid, public_key, tags FROM old_member;""",
+                    u"""-- remove old member table
+                      DROP TABLE old_member;""",
+                    u"""-- update database version
+                      UPDATE option SET value = '17' WHERE key = 'database_version';"""])
                 self._logger.info("upgrade database %d -> %d (done)", database_version, 17)
 
             # upgrade from version 17 to version 18
             if database_version < 18:
                 # In version 18, we remove the tags column as we don't have blackisting anymore
                 self._logger.debug("upgrade database %d -> %d", database_version, 18)
-                self.executescript(u"""
--- move / remove old member table
-DROP INDEX IF EXISTS member_mid_index;
-ALTER TABLE member RENAME TO old_member;
--- create new member table
-CREATE TABLE member(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- mid BLOB,                                      -- member identifier (sha1 of public_key)
- public_key BLOB);                               -- member public key
-CREATE INDEX member_mid_index ON member(mid);
--- fill new member table with old data
-INSERT INTO member (id, mid, public_key) SELECT id, mid, public_key FROM old_member;
--- remove old member table
-DROP TABLE old_member;
--- remove table malicious_proof
-DROP TABLE IF EXISTS malicious_proof;
--- update database version
-UPDATE option SET value = '18' WHERE key = 'database_version';
-""")
+                self.stormdb.executescript([
+                    u"""-- move / remove old member table
+                      DROP INDEX IF EXISTS member_mid_index;""",
+                    u"""ALTER TABLE member RENAME TO old_member;""",
+                    u"""-- create new member table
+                      CREATE TABLE member(
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      mid BLOB,                                      -- member identifier (sha1 of public_key)
+                      public_key BLOB);                               -- member public key""",
+                    u"""CREATE INDEX member_mid_index ON member(mid);""",
+                    u"""-- fill new member table with old data
+                      INSERT INTO member (id, mid, public_key) SELECT id, mid, public_key FROM old_member;""",
+                    u"""-- remove old member table
+                      DROP TABLE old_member;""",
+                    u"""-- remove table malicious_proof
+                      DROP TABLE IF EXISTS malicious_proof;""",
+                    u"""-- update database version
+                      UPDATE option SET value = '18' WHERE key = 'database_version';""",
+                ])
                 self.commit()
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 18)
 
@@ -142,35 +142,34 @@ UPDATE option SET value = '18' WHERE key = 'database_version';
                 # actually simplify the code.
                 self._logger.debug("upgrade database %d -> %d", database_version, 19)
 
-                self.executescript(u"""
--- move / remove old member table
-DROP INDEX IF EXISTS member_mid_index;
-ALTER TABLE member RENAME TO old_member;
--- create new member table
- CREATE TABLE member(
- id INTEGER PRIMARY KEY AUTOINCREMENT,
- mid BLOB,                                      -- member identifier (sha1 of public_key)
- public_key BLOB,                               -- member public key
- private_key BLOB);                             -- member private key
-CREATE INDEX member_mid_index ON member(mid);
--- fill new member table with old data
-INSERT INTO member (id, mid, public_key, private_key)
-                SELECT id, mid, public_key, private_key.private_key FROM old_member
-                LEFT JOIN private_key ON private_key.member = old_member.id;
--- remove old member table
-DROP TABLE old_member;
--- remove table private_key
-DROP TABLE IF EXISTS private_key;
--- update database version
-UPDATE option SET value = '19' WHERE key = 'database_version';
-""")
+                self.stormdb.executescript([
+                    u"""-- move / remove old member table
+                      DROP INDEX IF EXISTS member_mid_index;""",
+                    u"""ALTER TABLE member RENAME TO old_member;""",
+                    u"""-- create new member table
+                      CREATE TABLE member(
+                      id INTEGER PRIMARY KEY AUTOINCREMENT,
+                      mid BLOB,                                      -- member identifier (sha1 of public_key)
+                      public_key BLOB,                               -- member public key
+                      private_key BLOB);                             -- member private key""",
+                    u"""CREATE INDEX member_mid_index ON member(mid);""",
+                    u"""-- fill new member table with old data
+                      INSERT INTO member (id, mid, public_key, private_key)
+                                    SELECT id, mid, public_key, private_key.private_key FROM old_member
+                                    LEFT JOIN private_key ON private_key.member = old_member.id;""",
+                    u"""-- remove old member table
+                      DROP TABLE old_member;""",
+                    u"""-- remove table  private_key
+                      DROP TABLE IF EXISTS private_key;""",
+                    u"""-- update database version
+                      UPDATE option SET value = '19' WHERE key = 'database_version';"""])
                 self.commit()
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 19)
 
-            # Upgrade from 19 to 20
-            if database_version < 20:
-                # Let's store the sequence numbers in the database instead of quessing
-                self._logger.debug("upgrade database %d -> %d", database_version, 20)
+                # Upgrade from 19 to 20
+                if database_version < 20:
+                    # Let's store the sequence numbers in the database instead of quessing
+                    self._logger.debug("upgrade database %d -> %d", database_version, 20)
 
                 self.executescript(u"""
 DROP INDEX IF EXISTS sync_meta_message_undone_global_time_index;
@@ -214,10 +213,10 @@ UPDATE option SET value = '20' WHERE key = 'database_version';
                 self.commit()
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 20)
 
-            # Upgrade from 20 to 21
-            if database_version < 21:
-                # remove 'cluster' column from meta_message table
-                self._logger.debug("upgrade database %d -> %d", database_version, 21)
+                # Upgrade from 20 to 21
+                if database_version < 21:
+                    # remove 'cluster' column from meta_message table
+                    self._logger.debug("upgrade database %d -> %d", database_version, 21)
                 self.executescript(u"""
 CREATE TABLE meta_message_new(
  id INTEGER PRIMARY KEY AUTOINCREMENT,
