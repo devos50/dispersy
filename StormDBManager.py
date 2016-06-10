@@ -175,14 +175,12 @@ class StormDBManager:
         :param argv: A dictionary where the key represents the column and the value the value to be inserted.
         :return: A deferred that fires when the data has been inserted.
         """
-        return self._insert(table_name, **kwargs)
-        # return self.db_lock.run(self._insert, table_name, **kwargs)
-
-    # @transact
-    def _insert(self, table_name, **kwargs):
-        # connection = Connection(self._database)
-        self.__insert(self.connection, table_name, **kwargs)
-        # connection.close()
+        # @transact
+        def _insert(self, table_name, **kwargs):
+            # connection = Connection(self._database)
+            self.__insert(self.connection, table_name, **kwargs)
+            # connection.close()
+        return self.db_lock.run(_insert, self, table_name, **kwargs)
 
     def __insert(self, connection, table_name, **kwargs):
         """
