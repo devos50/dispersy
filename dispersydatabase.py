@@ -229,93 +229,6 @@ class DispersyDatabase(Database):
         assert isinstance(database_version, int)
         assert database_version >= 0
 
-        if database_version < 8:
-            self._logger.debug("upgrade community %d -> %d", database_version, 8)
-
-            # patch notes:
-            #
-            # - the undone column in the sync table is not a boolean anymore.  instead it points to
-            #   the row id of one of the associated dispersy-undo-own or dispersy-undo-other
-            #   messages
-            #
-            # - we know that Dispersy.create_undo has been called while the member did not have
-            #   permission to do so.  hence, invalid dispersy-undo-other messages have been stored
-            #   in the local database, causing problems with the sync.  these need to be removed
-            #
-            updates = []
-            deletes = []
-            redoes = []
-            convert_packet_to_message = community.dispersy.convert_packet_to_message
-            undo_own_meta = community.get_meta_message(u"dispersy-undo-own")
-            undo_other_meta = community.get_meta_message(u"dispersy-undo-other")
-
-            progress = 0
-            count, = self.execute(u"SELECT COUNT(1) FROM sync WHERE meta_message = ? OR meta_message = ?",
-                                  (undo_own_meta.database_id, undo_other_meta.database_id)).next()
-            self._logger.debug("upgrading %d undo messages", count)
-            if count > 50:
-                progress_handlers = [handler("Upgrading database", "Please wait while we upgrade the database", count)
-                                     for handler in community.dispersy.get_progress_handlers()]
-            else:
-                progress_handlers = []
-
-            for packet_id, packet in list(
-                    self.execute(u"SELECT id, packet FROM sync WHERE meta_message = ?", (undo_own_meta.database_id,))):
-                message = convert_packet_to_message(str(packet), community, verify=False)
-                if message:
-                    # 12/09/12 Boudewijn: the check_callback is required to obtain the
-                    # message.payload.packet
-                    for _ in message.check_callback([message]):
-                        pass
-                    updates.append((packet_id, message.payload.packet.packet_id))
-
-                progress += 1
-                for handler in progress_handlers:
-                    handler.Update(progress)
-
-            for packet_id, packet in list(self.execute(u"SELECT id, packet FROM sync WHERE meta_message = ?",
-                                                       (undo_other_meta.database_id,))):
-                message = convert_packet_to_message(str(packet), community, verify=False)
-                if message:
-                    # 12/09/12 Boudewijn: the check_callback is required to obtain the
-                    # message.payload.packet
-                    for _ in message.check_callback([message]):
-                        pass
-                    allowed, _ = community._timeline.check(message)
-                    if allowed:
-                        updates.append((packet_id, message.payload.packet.packet_id))
-
-                    else:
-                        deletes.append((packet_id,))
-                        msg = message.payload.packet.load_message()
-                        redoes.append((msg.packet_id,))
-                        if msg.undo_callback:
-                            try:
-                                # try to redo the message... this may not always be possible now...
-                                msg.undo_callback([(msg.authentication.member, msg.distribution.global_time, msg)],
-                                                  redo=True)
-                            except Exception as exception:
-                                self._logger.exception("%s", exception)
-
-                progress += 1
-                for handler in progress_handlers:
-                    handler.Update(progress)
-
-            for handler in progress_handlers:
-                handler.Update(progress, "Saving the results...")
-
-            # note: UPDATE first, REDOES second, since UPDATES contains undo items that may have
-            # been invalid
-            self.executemany(u"UPDATE sync SET undone = ? WHERE id = ?", updates)
-            self.executemany(u"UPDATE sync SET undone = 0 WHERE id = ?", redoes)
-            self.executemany(u"DELETE FROM sync WHERE id = ?", deletes)
-
-            self.execute(u"UPDATE community SET database_version = 8 WHERE id = ?", (community.database_id,))
-            self.commit()
-
-            for handler in progress_handlers:
-                handler.Destroy()
-
         if database_version < 21:
             self._logger.debug("upgrade community %d -> %d", database_version, 20)
 
@@ -365,7 +278,7 @@ class DispersyDatabase(Database):
             count = 0
             deletes = []
             for meta in metas:
-                i, = next(self.execute(u"SELECT COUNT(*) FROM sync WHERE meta_message = ?", (meta.database_id,)))
+                i, = self.stormdb.fetchone(u"SELECT COUNT(*) FROM sync WHERE meta_message = ?", (meta.database_id,))
                 count += i
             self._logger.debug("checking %d sequence number enabled messages [%s]", count, community.cid.encode("HEX"))
             if count > 50:
@@ -376,8 +289,8 @@ class DispersyDatabase(Database):
 
             sequence_updates = []
             for meta in metas:
-                rows = list(self.execute(u"SELECT id, member, packet FROM sync "
-                                         u"WHERE meta_message = ? ORDER BY member, global_time", (meta.database_id,)))
+                rows = self.stormdb.fetchall(u"SELECT id, member, packet FROM sync "
+                                         u"WHERE meta_message = ? ORDER BY member, global_time", (meta.database_id,))
                 groups = groupby(rows, key=lambda tup: tup[1])
                 for member_id, iterator in groups:
                     last_global_time = 0
@@ -410,23 +323,22 @@ class DispersyDatabase(Database):
 
             self._logger.debug("will delete %d packets from the database", len(deletes))
             if deletes:
-                self.executemany(u"DELETE FROM sync WHERE id = ?", deletes)
+                self.stormdb.executemany(u"DELETE FROM sync WHERE id = ?", deletes)
 
             if sequence_updates:
-                self.executemany(u"UPDATE sync SET sequence = ? WHERE id = ?", sequence_updates)
+                self.stormdb.executemany(u"UPDATE sync SET sequence = ? WHERE id = ?", sequence_updates)
 
             # we may have removed some undo-other or undo-own messages.  we must ensure that there
             # are no messages in the database that point to these removed messages
-            updates = list(self.execute(u"""
+            updates = self.stormdb.fetchall(u"""
             SELECT a.id
             FROM sync a
             LEFT JOIN sync b ON a.undone = b.id
-            WHERE a.community = ? AND a.undone > 0 AND b.id IS NULL""", (community.database_id,)))
+            WHERE a.community = ? AND a.undone > 0 AND b.id IS NULL""", (community.database_id,))
             if updates:
-                self.executemany(u"UPDATE sync SET undone = 0 WHERE id = ?", updates)
+                self.stormdb.executemany(u"UPDATE sync SET undone = 0 WHERE id = ?", updates)
 
-            self.execute(u"UPDATE community SET database_version = 21 WHERE id = ?", (community.database_id,))
-            self.commit()
+            self.stormdb.execute(u"UPDATE community SET database_version = 21 WHERE id = ?", (community.database_id,))
 
             for handler in progress_handlers:
                 handler.Destroy()
