@@ -9,7 +9,7 @@ from time import time, sleep
 from unittest import skip, skipUnless
 import logging
 
-from nose.twistedtools import reactor
+from nose.twistedtools import reactor, deferred
 from twisted.internet.defer import Deferred, inlineCallbacks, returnValue
 from twisted.internet.task import deferLater
 
@@ -160,7 +160,7 @@ class TestBootstrapServers(DispersyTestFunc):
                 self._pcandidates.sort(cmp=lambda a, b: cmp(a.sock_addr, b.sock_addr))
 
                 for _ in xrange(PING_COUNT):
-                    self.ping(time())
+                    yield self.ping(time())
                     yield deferLater(reactor, 1, lambda: None)
                     self.summary()
                 self.test_d.callback(None)
@@ -176,11 +176,12 @@ class TestBootstrapServers(DispersyTestFunc):
                         self._identifiers[candidate.sock_addr] = message.authentication.member.mid
                 return super(DebugCommunity, self).on_introduction_response(messages)
 
+            @inlineCallbacks
             def ping(self, now):
                 self._logger.debug("PING")
                 self._pings_done += 1
                 for candidate in self._pcandidates:
-                    request = self.create_introduction_request(candidate, False)
+                    request = yield self.create_introduction_request(candidate, False)
                     self._request[candidate.sock_addr][request.payload.identifier] = now
 
             def summary(self):
@@ -238,7 +239,7 @@ class TestBootstrapServers(DispersyTestFunc):
             dispersy = Dispersy(StandaloneEndpoint(0), u".", u":memory:")
             dispersy.start(autoload_discovery=True)
             self.dispersy_objects.append(dispersy)
-            community = PingCommunity.create_community(dispersy, dispersy.get_new_member())
+            community = yield PingCommunity.create_community(dispersy, dispersy.get_new_member())
             yield community.test_d
             dispersy.stop()
             returnValue(community)
@@ -249,6 +250,8 @@ class TestBootstrapServers(DispersyTestFunc):
 
     # TODO(emilon): port this to twisted
     @skip("The stress test is not actually a unittest")
+    @deferred(timeout=10)
+    @inlineCallbacks
     def test_perform_heavy_stress_test(self):
         """
         Sends many a dispersy-introduction-request messages to a single tracker and counts how long
@@ -325,11 +328,12 @@ class TestBootstrapServers(DispersyTestFunc):
 
                     yield DropMessage(message, "not doing anything in this script")
 
+            @inlineCallbacks
             def prepare_ping(self, member):
                 self._my_member = member
                 try:
                     for candidate in self._pcandidates:
-                        request = self._dispersy.create_introduction_request(self, candidate, False, forward=False)
+                        request = yield self._dispersy.create_introduction_request(self, candidate, False, forward=False)
                         self._queue.append((request.payload.identifier, request.packet, candidate))
                 finally:
                     self._my_member = self._original_my_member
@@ -341,11 +345,13 @@ class TestBootstrapServers(DispersyTestFunc):
 
                 self._queue = self._queue[count:]
 
+            # TODO(Laurens): This method never gets called.
+            @inlineCallbacks
             def ping(self, member):
                 self._my_member = member
                 try:
                     for candidate in self._pcandidates:
-                        request = self._dispersy.create_introduction_request(self, candidate, False)
+                        request = yield self._dispersy.create_introduction_request(self, candidate, False)
                         self._request[candidate.sock_addr][request.payload.identifier] = time()
                 finally:
                     self._my_member = self._original_my_member
@@ -371,8 +377,10 @@ class TestBootstrapServers(DispersyTestFunc):
         self._logger.info("prepare communities, members, etc")
         with self._dispersy.database:
             candidates = [Candidate(("130.161.211.245", 6429), False)]
-            communities = [PingCommunity.create_community(self._dispersy, self._my_member, candidates)
-                           for _ in xrange(COMMUNITIES)]
+            communities = []
+            for _ in xrange(COMMUNITIES):
+                community = yield PingCommunity.create_community(self._dispersy, self._my_member, candidates)
+                communities.append(community)
             members = [self._dispersy.get_new_member(u"low") for _ in xrange(MEMBERS)]
 
             for community in communities:
@@ -383,7 +391,7 @@ class TestBootstrapServers(DispersyTestFunc):
         for _ in xrange(ROUNDS):
             for community in communities:
                 for member in members:
-                    community.prepare_ping(member)
+                    yield community.prepare_ping(member)
 
             sleep(5)
         sleep(15)
@@ -407,5 +415,5 @@ class TestBootstrapServers(DispersyTestFunc):
             community.summary()
 
         # cleanup
-        community.create_destroy_community(u"hard-kill")
+        yield community.create_destroy_community(u"hard-kill")
         self._dispersy.get_community(community.cid).unload_community()

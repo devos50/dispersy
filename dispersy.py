@@ -48,7 +48,7 @@ from time import time
 
 import netifaces
 from twisted.internet import reactor
-from twisted.internet.defer import maybeDeferred, gatherResults
+from twisted.internet.defer import maybeDeferred, gatherResults, inlineCallbacks, returnValue
 from twisted.internet.task import LoopingCall
 from twisted.python.failure import Failure
 from twisted.python.threadable import isInIOThread
@@ -1438,6 +1438,7 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
         assert all(isinstance(packet, str) for packet in packets), [type(packet) for packet in packets]
         return [self.convert_packet_to_message(packet, community, load, auto_load, candidate, verify) for packet in packets]
 
+    @inlineCallbacks
     def on_incoming_packets(self, packets, cache=True, timestamp=0.0, source=u"unknown"):
         """
         Process incoming UDP packets.
@@ -1480,7 +1481,7 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
                 # find associated community
                 try:
                     community = self.get_community(community_id)
-                    community.on_incoming_packets(list(iterator), cache, timestamp, source)
+                    yield community.on_incoming_packets(list(iterator), cache, timestamp, source)
 
                 except CommunityNotFoundException:
                     packets = list(iterator)
@@ -1493,6 +1494,7 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
             self._logger.info("dropping %d packets as dispersy is not running", len(packets))
 
     @attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
+    @inlineCallbacks
     def _store(self, messages):
         """
         Store a message in the database.
@@ -1558,10 +1560,10 @@ WHERE sync.meta_message = ? AND double_signed_sync.member1 = ? AND double_signed
                 member1 = message.authentication.members[0].database_id
                 member2 = message.authentication.members[1].database_id
                 if member1 < member2:
-                    self._database.stormdb.insert(u"double_signed_sync", sync=message.packet_id, member1=member1,
+                    yield self._database.stormdb.insert(u"double_signed_sync", sync=message.packet_id, member1=member1,
                                                   member2=member2)
                 else:
-                    self._database.stormdb.insert(u"double_signed_sync", sync=message.packet_id, member1=member2,
+                    yield self._database.stormdb.insert(u"double_signed_sync", sync=message.packet_id, member1=member2,
                                                   member2=member1)
 
             # update global time
@@ -1663,6 +1665,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
         return lan_address, wan_address
 
     # TODO(emilon): Now that we have removed the malicious behaviour stuff, maybe we could be a bit more relaxed with the DB syncing?
+    @inlineCallbacks
     def store_update_forward(self, possibly_messages, store, update, forward):
         """
         Usually we need to do three things when we have a valid messages: (1) store it in our local
@@ -1717,11 +1720,11 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
         store = store and isinstance(messages[0].meta.distribution, SyncDistribution)
         if store:
-            self._store(messages)
+            yield self._store(messages)
 
         if update:
             if self._update(possibly_messages) == False:
-                return False
+                returnValue(False)
 
         # 07/10/11 Boudewijn: we will only commit if it the message was create by our self.
         # Otherwise we can safely skip the commit overhead, since, if a crash occurs, we will be
@@ -1735,9 +1738,9 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                 messages[0].community.statistics.increase_msg_count(u"created", messages[0].meta.name, my_messages)
 
         if forward:
-            return self._forward(messages)
+            returnValue(self._forward(messages))
 
-        return True
+        returnValue(True)
 
     @attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
     def _update(self, messages):

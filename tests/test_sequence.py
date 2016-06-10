@@ -221,6 +221,7 @@ class TestIncomingMissingSequence(DispersyTestFunc):
             for seq, expected_seq in zip(responses, expected_responses):
                 self.assertEqual(seq, expected_seq)
 
+
 class TestOutgoingMissingSequence(DispersyTestFunc):
 
     def test_missing(self):

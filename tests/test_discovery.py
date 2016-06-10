@@ -55,6 +55,7 @@ class TestDiscovery(DispersyTestFunc):
         other._community.get_most_similar = lambda candidate: get_most_similar(orig_method, candidate)
 
         other._community.add_discovered_candidate(self._mm.my_candidate)
+        # This calls take_step in debug node. This is wrapped in @blockincallfromthread so it's synchronous.
         other.take_step()
 
         self._mm.process_packets()

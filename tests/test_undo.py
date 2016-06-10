@@ -1,3 +1,6 @@
+from nose.twistedtools import deferred
+from twisted.internet.defer import inlineCallbacks, returnValue
+
 from .dispersytestclass import DispersyTestFunc
 
 
@@ -28,6 +31,7 @@ class TestUndo(DispersyTestFunc):
         node.assert_is_undone(messages=messages)
         node.assert_is_stored(messages=undoes)
 
+    @inlineCallbacks
     def test_node_undo_other(self):
         """
         MM gives NODE permission to undo, OTHER generates a few messages and then NODE undoes
@@ -37,7 +41,7 @@ class TestUndo(DispersyTestFunc):
         other.send_identity(node)
 
         # MM grants undo permission to NODE
-        authorize = self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"full-sync-text"), u"undo")], self._mm.claim_global_time())
+        authorize = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"full-sync-text"), u"undo")], self._mm.claim_global_time())
         node.give_message(authorize, self._mm)
         other.give_message(authorize, self._mm)
 
@@ -68,12 +72,16 @@ class TestUndo(DispersyTestFunc):
         node.give_message(message, node)
 
         # undo twice
+        @inlineCallbacks
         def create_undoes():
-            return node._community.create_undo(message), node._community.create_undo(message)
-        undo1, undo2 = node.call(create_undoes)
+            u1 = yield node._community.create_undo(message)
+            u2 = yield node._community.create_undo(message)
+            returnValue((u1, u2))
+        undo1, undo2 = yield node.call(create_undoes)
 
         self.assertEqual(undo1.packet, undo2.packet)
 
+    @inlineCallbacks
     def test_node_resolve_undo_twice(self):
         """
         Make sure that in the event of receiving two undo messages from the same member, both will be stored,
@@ -87,7 +95,7 @@ class TestUndo(DispersyTestFunc):
         node.send_identity(other)
 
         # MM grants undo permission to NODE
-        authorize = self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"full-sync-text"), u"undo")], self._mm.claim_global_time())
+        authorize = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"full-sync-text"), u"undo")], self._mm.claim_global_time())
         node.give_message(authorize, self._mm)
         other.give_message(authorize, self._mm)
 
@@ -121,7 +129,7 @@ class TestUndo(DispersyTestFunc):
         def fetch_all_messages():
             for row in other._dispersy.database.stormdb.fetchall(u"SELECT * FROM sync"):
                 self._logger.debug("_______ %s", row)
-        other.call(fetch_all_messages)
+        yield other.call(fetch_all_messages)
 
         self._logger.debug("%d", len(low_message.packet))
 
@@ -171,6 +179,7 @@ class TestUndo(DispersyTestFunc):
         other.assert_is_undone(messages=messages)
         other.assert_is_stored(messages=undoes)
 
+    @inlineCallbacks
     def test_revoke_causing_undo(self):
         """
         SELF gives NODE permission to undo, OTHER created a message, NODE undoes the message, SELF
@@ -180,7 +189,7 @@ class TestUndo(DispersyTestFunc):
         node.send_identity(other)
 
         # MM grants undo permission to NODE
-        authorize = self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"full-sync-text"), u"undo")], self._mm.claim_global_time())
+        authorize = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"full-sync-text"), u"undo")], self._mm.claim_global_time())
         node.give_message(authorize, self._mm)
         other.give_message(authorize, self._mm)
 
@@ -196,10 +205,11 @@ class TestUndo(DispersyTestFunc):
         other.assert_is_stored(undo)
 
         # SELF revoke undo permission from NODE, as the globaltime of the mm is lower than 42 the message needs to be done
-        revoke = self._mm.create_revoke([(node.my_member, self._community.get_meta_message(u"full-sync-text"), u"undo")])
+        revoke = yield self._mm.create_revoke([(node.my_member, self._community.get_meta_message(u"full-sync-text"), u"undo")])
         other.give_message(revoke, self._mm)
         other.assert_is_done(message)
 
+    @inlineCallbacks
     def test_revoke_causing_undo_permitted(self):
         """
         SELF gives NODE permission to undo, OTHER created a message, NODE undoes the message, SELF
@@ -209,12 +219,12 @@ class TestUndo(DispersyTestFunc):
         node.send_identity(other)
 
         # MM grants permit permission to OTHER
-        authorize = self._mm.create_authorize([(other.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit")], self._mm.claim_global_time())
+        authorize = yield self._mm.create_authorize([(other.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit")], self._mm.claim_global_time())
         node.give_message(authorize, self._mm)
         other.give_message(authorize, self._mm)
 
         # MM grants undo permission to NODE
-        authorize = self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"undo")], self._mm.claim_global_time())
+        authorize = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"undo")], self._mm.claim_global_time())
         node.give_message(authorize, self._mm)
         other.give_message(authorize, self._mm)
 
@@ -230,6 +240,6 @@ class TestUndo(DispersyTestFunc):
         other.assert_is_stored(undo)
 
         # SELF revoke undo permission from NODE, as the globaltime of the mm is lower than 42 the message needs to be done
-        revoke = self._mm.create_revoke([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"undo")])
+        revoke = yield self._mm.create_revoke([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"undo")])
         other.give_message(revoke, self._mm)
         other.assert_is_done(message)

@@ -6,6 +6,8 @@ from tempfile import mkdtemp
 
 # Do not (re)move the reactor import, even if we aren't using it
 # (nose starts the reactor in a separate thread when importing this)\
+from twisted.python.threadable import isInIOThread
+
 if "twisted.internet.reactor" in sys.modules.keys():
     """ Tribler already imported the reactor. """
     from twisted.internet import reactor
@@ -85,6 +87,7 @@ class DispersyTestFunc(TestCase):
         """
 
         """ Override this method in a subclass with a different community class to test communities. """
+
         @inlineCallbacks
         def _create_nodes(amount, store_identity, tunnel, communityclass, autoload_discovery, memory_database):
             nodes = []
@@ -99,7 +102,7 @@ class DispersyTestFunc(TestCase):
 
                 self.dispersy_objects.append(dispersy)
 
-                node = self._create_node(dispersy, communityclass, self._mm)
+                node = yield self._create_node(dispersy, communityclass, self._mm)
                 yield node.init_my_member(tunnel=tunnel, store_identity=store_identity)
 
                 nodes.append(node)
@@ -109,5 +112,8 @@ class DispersyTestFunc(TestCase):
         return blockingCallFromThread(reactor, _create_nodes, amount, store_identity, tunnel, community_class,
                                       autoload_discovery, memory_database)
 
+    @inlineCallbacks
     def _create_node(self, dispersy, community_class, c_master_member):
-        return DebugNode(self, dispersy, community_class, c_master_member)
+        node = DebugNode(self, dispersy)
+        yield node.initialize_community(community_class, c_master_member)
+        returnValue(node)

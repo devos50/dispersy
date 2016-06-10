@@ -1,24 +1,27 @@
 from .dispersytestclass import DispersyTestFunc
+from twisted.internet.defer import inlineCallbacks, returnValue
 
 
 class TestSync(DispersyTestFunc):
 
+    @inlineCallbacks
     def _create_nodes_messages(self, messagetype="create_full_sync_text"):
         node, other = self.create_nodes(2)
         other.send_identity(node)
 
         # other creates messages
         messages = [getattr(other, messagetype)("Message %d" % i, i + 10) for i in xrange(30)]
-        other.store(messages)
+        yield other.store(messages)
 
-        return node, other, messages
+        returnValue((node, other, messages))
 
+    @inlineCallbacks
     def test_modulo(self):
         """
         OTHER creates several messages, NODE asks for specific modulo to sync and only those modulo
         may be sent back.
         """
-        node, other, messages = self._create_nodes_messages()
+        node, other, messages = yield self._create_nodes_messages()
 
         for modulo in xrange(0, 10):
             for offset in xrange(0, modulo):
@@ -33,9 +36,9 @@ class TestSync(DispersyTestFunc):
 
                 self.assertEqual(sorted(global_times), sorted(response_times))
 
-
+    @inlineCallbacks
     def test_range(self):
-        node, other, messages = self._create_nodes_messages()
+        node, other, messages = yield self._create_nodes_messages()
 
         for time_low in xrange(1, 11):
             for time_high in xrange(20, 30):
@@ -50,9 +53,9 @@ class TestSync(DispersyTestFunc):
 
                 self.assertEqual(sorted(global_times), sorted(response_times))
 
-
+    @inlineCallbacks
     def test_in_order(self):
-        node, other, messages = self._create_nodes_messages('create_in_order_text')
+        node, other, messages = yield self._create_nodes_messages('create_in_order_text')
         global_times = [message.distribution.global_time for message in messages]
 
         # send an empty sync message to obtain all messages ASC order
@@ -63,9 +66,9 @@ class TestSync(DispersyTestFunc):
 
         self.assertEqual(sorted(global_times), sorted(response_times))
 
-
+    @inlineCallbacks
     def test_out_order(self):
-        node, other, messages = self._create_nodes_messages('create_out_order_text')
+        node, other, messages = yield self._create_nodes_messages('create_out_order_text')
         global_times = [message.distribution.global_time for message in messages]
 
         # send an empty sync message to obtain all messages DESC order
@@ -76,9 +79,9 @@ class TestSync(DispersyTestFunc):
 
         self.assertEqual(sorted(global_times), sorted(response_times))
 
-
+    @inlineCallbacks
     def test_random_order(self):
-        node, other, messages = self._create_nodes_messages('create_random_order_text')
+        node, other, messages = yield self._create_nodes_messages('create_random_order_text')
         global_times = [message.distribution.global_time for message in messages]
 
         # send an empty sync message to obtain all messages in RANDOM order
@@ -90,7 +93,7 @@ class TestSync(DispersyTestFunc):
         self.assertNotEqual(response_times, sorted(global_times))
         self.assertNotEqual(response_times, sorted(global_times, reverse=True))
 
-
+    @inlineCallbacks
     def test_mixed_order(self):
         node, other = self.create_nodes(2)
         other.send_identity(node)
@@ -100,9 +103,9 @@ class TestSync(DispersyTestFunc):
         out_order_messages = [other.create_out_order_text("Message %d" % i, i + 10) for i in xrange(1, 30, 3)]
         random_order_messages = [other.create_random_order_text("Message %d" % i, i + 10) for i in xrange(2, 30, 3)]
 
-        other.store(in_order_messages)
-        other.store(out_order_messages)
-        other.store(random_order_messages)
+        yield other.store(in_order_messages)
+        yield other.store(out_order_messages)
+        yield other.store(random_order_messages)
 
         # send an empty sync message to obtain all messages ALL messages
         other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (1, 0, 1, 0, []), 42), node)
@@ -122,6 +125,7 @@ class TestSync(DispersyTestFunc):
         self.assertNotEqual(received_random_order, sorted([message.distribution.global_time for message in random_order_messages]))
         self.assertNotEqual(received_random_order, sorted([message.distribution.global_time for message in random_order_messages], reverse=True))
 
+    @inlineCallbacks
     def test_priority_order(self):
         node, other = self.create_nodes(2)
         other.send_identity(node)
@@ -131,9 +135,9 @@ class TestSync(DispersyTestFunc):
         low_priority_messages = [other.create_low_priority_text("Message %d" % i, i + 10) for i in xrange(1, 30, 3)]
         medium_priority_messages = [other.create_medium_priority_text("Message %d" % i, i + 10) for i in xrange(2, 30, 3)]
 
-        other.store(high_priority_messages)
-        other.store(low_priority_messages)
-        other.store(medium_priority_messages)
+        yield other.store(high_priority_messages)
+        yield other.store(low_priority_messages)
+        yield other.store(medium_priority_messages)
 
         # send an empty sync message to obtain all messages ALL messages
         other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (1, 0, 1, 0, []), 42), node)
@@ -183,7 +187,7 @@ class TestSync(DispersyTestFunc):
         self.assertEqual(message.distribution.global_time, new_message.distribution.global_time)
 
     def test_last_9(self):
-        message = self._community.get_meta_message(u"last-9-test")
+        self._community.get_meta_message(u"last-9-test")
 
         node, other = self.create_nodes(2)
         other.send_identity(node)
@@ -220,6 +224,7 @@ class TestSync(DispersyTestFunc):
         for _, message in messages_so_far:
             node.assert_is_stored(message)
 
+    @inlineCallbacks
     def test_last_1_doublemember(self):
         """
         Normally the LastSyncDistribution policy stores the last N messages for each member that
@@ -258,6 +263,7 @@ class TestSync(DispersyTestFunc):
             _, message = origin.receive_message(names=[u"dispersy-signature-response"]).next()
             return (global_time, message.payload.message)
 
+        @inlineCallbacks
         def check_database_contents():
             # TODO(emilon): This could be done better.
             def fetch_rows():
@@ -272,7 +278,8 @@ class TestSync(DispersyTestFunc):
 
             entries = []
             database_ids = {}
-            for global_time, member, sync_member1, sync_member2, mid1, mid2 in nodeA.call(fetch_rows):
+            rows = yield nodeA.call(fetch_rows)
+            for global_time, member, sync_member1, sync_member2, mid1, mid2 in rows:
                 entries.append((global_time, member, sync_member1, sync_member2))
                 database_ids[str(mid1)] = sync_member1
                 database_ids[str(mid2)] = sync_member2
@@ -330,7 +337,7 @@ class TestSync(DispersyTestFunc):
             current_global_timeC = max(global_timeC, current_global_timeC)
 
             nodeA.give_messages([messageB, messageC], nodeB)
-            check_database_contents()
+            yield check_database_contents()
 
         # as proof for the drop, the more recent messages should be sent back to nodeB
         times = []
@@ -344,4 +351,4 @@ class TestSync(DispersyTestFunc):
         create_double_signed_message(nodeB, nodeA, "Allow=True (2BA)", old_global_time)
         create_double_signed_message(nodeC, nodeA, "Allow=True (2CA)", old_global_time)
 
-        check_database_contents()
+        yield check_database_contents()

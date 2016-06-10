@@ -1,18 +1,29 @@
+from twisted.internet.defer import inlineCallbacks
+
 from .dispersytestclass import DispersyTestFunc
 
 
 class TestWalker(DispersyTestFunc):
 
-    def test_one_walker(self): return self.check_walker([""])
-    def test_two_walker(self): return self.check_walker(["", ""])
-    def test_many_walker(self): return self.check_walker([""] * 22)
-    def test_one_t_walker(self): return self.check_walker(["t"])
-    def test_two_t_walker(self): return self.check_walker(["t", "t"])
-    def test_many_t_walker(self): return self.check_walker(["t"] * 22)
-    def test_two_mixed_walker_a(self): return self.check_walker(["", "t"])
-    def test_many_mixed_walker_a(self): return self.check_walker(["", "t"] * 11)
-    def test_two_mixed_walker_b(self): return self.check_walker(["t", ""])
-    def test_many_mixed_walker_b(self): return self.check_walker(["t", ""] * 11)
+    def test_one_walker(self): self.check_walker([""])
+    
+    def test_two_walker(self): self.check_walker(["", ""])
+    
+    def test_many_walker(self): self.check_walker([""] * 22)
+    
+    def test_one_t_walker(self): self.check_walker(["t"])
+
+    def test_two_t_walker(self): self.check_walker(["t", "t"])
+
+    def test_many_t_walker(self): self.check_walker(["t"] * 22)
+
+    def test_two_mixed_walker_a(self): self.check_walker(["", "t"])
+
+    def test_many_mixed_walker_a(self): self.check_walker(["", "t"] * 11)
+
+    def test_two_mixed_walker_b(self): self.check_walker(["t", ""])
+
+    def test_many_mixed_walker_b(self): self.check_walker(["t", ""] * 11)
 
     def create_others(self, all_flags):
         assert isinstance(all_flags, list)
@@ -25,6 +36,7 @@ class TestWalker(DispersyTestFunc):
 
         return nodes
 
+    @inlineCallbacks
     def check_walker(self, all_flags):
         """
         All nodes will perform a introduction request to SELF in one batch.
@@ -47,7 +59,8 @@ class TestWalker(DispersyTestFunc):
                     in enumerate(nodes, 1)]
 
         # give all requests in one batch to dispersy
-        self._mm.call(self._dispersy.on_incoming_packets, [(node.my_candidate, node.encode_message(request))
+        incoming_packets = yield self._dispersy.on_incoming_packets
+        yield self._mm.call(incoming_packets, [(node.my_candidate, node.encode_message(request))
                                              for node, request
                                              in zip(nodes, requests)])
 

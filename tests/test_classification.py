@@ -1,3 +1,6 @@
+from nose.twistedtools import deferred
+from twisted.internet.defer import inlineCallbacks
+
 from ..exception import CommunityNotFoundException
 from ..util import call_on_reactor_thread
 from .debugcommunity.community import DebugCommunity
@@ -37,7 +40,9 @@ class TestClassification(DispersyTestFunc):
             self.fail()
         self.assertEqual(classification, ClassTestB.get_classification())
 
+    @deferred(timeout=10)
     @call_on_reactor_thread
+    @inlineCallbacks
     def test_reclassify_loaded_community(self):
         """
         Load a community, reclassify it, load all communities of that classification to check.
@@ -49,7 +54,7 @@ class TestClassification(DispersyTestFunc):
             pass
 
         # create community
-        community_c = ClassTestC.create_community(self._dispersy, self._mm._my_member)
+        community_c = yield ClassTestC.create_community(self._dispersy, self._mm._my_member)
         self.assertEqual(self._dispersy.database.stormdb.fetchone(u"SELECT COUNT(*) FROM community WHERE classification = ?",
                                                                   (ClassTestC.get_classification(),))[0], 1)
 
@@ -89,7 +94,9 @@ class TestClassification(DispersyTestFunc):
         self.assertEqual(len(communities), 1)
         self.assertIsInstance(communities[0], ClassificationLoadOneCommunities)
 
+    @deferred(timeout=10)
     @call_on_reactor_thread
+    @inlineCallbacks
     def test_load_two_communities(self):
         """
         Try to load communities of a certain classification while there is exactly two such
@@ -100,11 +107,11 @@ class TestClassification(DispersyTestFunc):
 
         masters = []
         # create two communities
-        community = LoadTwoCommunities.create_community(self._dispersy, self._mm.my_member)
+        community = yield LoadTwoCommunities.create_community(self._dispersy, self._mm.my_member)
         masters.append(community.master_member.public_key)
         community.unload_community()
 
-        community = LoadTwoCommunities.create_community(self._dispersy, self._mm.my_member)
+        community = yield LoadTwoCommunities.create_community(self._dispersy, self._mm.my_member)
         masters.append(community.master_member.public_key)
         community.unload_community()
 

@@ -1,3 +1,5 @@
+from twisted.internet.defer import inlineCallbacks
+
 from ..resolution import PublicResolution, LinearResolution
 from .dispersytestclass import DispersyTestFunc
 
@@ -23,6 +25,7 @@ class TestDynamicSettings(DispersyTestFunc):
 
         other.assert_is_stored(message)
 
+    @inlineCallbacks
     def test_change_resolution(self):
         """
         Change the resolution policy from default to linear.
@@ -38,7 +41,7 @@ class TestDynamicSettings(DispersyTestFunc):
         self.assertIsInstance(public_policy, PublicResolution)
 
         # change and check policy
-        message = self._mm.create_dynamic_settings([(meta, linear)], 42)
+        message = yield self._mm.create_dynamic_settings([(meta, linear)], 42)
         self._mm.give_message(message, self._mm)
         node.give_message(message, self._mm)
         other.give_message(message, self._mm)
@@ -62,6 +65,7 @@ class TestDynamicSettings(DispersyTestFunc):
         other.give_message(message, node)
         other.assert_not_stored(message)
 
+    @inlineCallbacks
     def test_change_resolution_undo(self):
         """
         Change the resolution policy from default to linear, the messages already accepted should be
@@ -80,8 +84,8 @@ class TestDynamicSettings(DispersyTestFunc):
         linear = meta.resolution.policies[1]
 
         # create policy change, but do not yet process
-        policy_linear = self._mm.create_dynamic_settings([(meta, linear)], 11)  # hence the linear policy starts at 12
-        policy_public = self._mm.create_dynamic_settings([(meta, public)], 21)  # hence the public policy starts at 22
+        policy_linear = yield self._mm.create_dynamic_settings([(meta, linear)], 11)  # hence the linear policy starts at 12
+        policy_public = yield self._mm.create_dynamic_settings([(meta, public)], 21)  # hence the public policy starts at 22
 
         # because above policy changes were not applied (i.e. update=False) everything is still
         # PublicResolution without any proof
@@ -113,6 +117,7 @@ class TestDynamicSettings(DispersyTestFunc):
         # policy change should have redone the tmessage
         other.assert_is_done(tmessage)
 
+    @inlineCallbacks
     def test_change_resolution_reject(self):
         """
         Change the resolution policy from default to linear and back, to see if other requests the proof
@@ -130,8 +135,8 @@ class TestDynamicSettings(DispersyTestFunc):
         linear = meta.resolution.policies[1]
 
         # create policy change, but do not yet process
-        policy_linear = self._mm.create_dynamic_settings([(meta, linear)], 11)  # hence the linear policy starts at 12
-        policy_public = self._mm.create_dynamic_settings([(meta, public)], 21)  # hence the public policy starts at 22
+        policy_linear = yield self._mm.create_dynamic_settings([(meta, linear)], 11)  # hence the linear policy starts at 12
+        policy_public = yield self._mm.create_dynamic_settings([(meta, public)], 21)  # hence the public policy starts at 22
 
         # because above policy changes were not applied (i.e. update=False) everything is still
         # PublicResolution without any proof
@@ -153,6 +158,7 @@ class TestDynamicSettings(DispersyTestFunc):
         other.give_message(policy_public, self._mm)
         other.assert_is_done(tmessage)
 
+    @inlineCallbacks
     def test_change_resolution_send_proof(self):
         """
         Change the resolution policy from default to linear and back, to see if other sends the proofs
@@ -170,8 +176,8 @@ class TestDynamicSettings(DispersyTestFunc):
         linear = meta.resolution.policies[1]
 
         # create policy change, but do not yet process
-        policy_linear = self._mm.create_dynamic_settings([(meta, linear)], 11)  # hence the linear policy starts at 12
-        policy_public = self._mm.create_dynamic_settings([(meta, public)], 21)  # hence the public policy starts at 22
+        policy_linear = yield self._mm.create_dynamic_settings([(meta, linear)], 11)  # hence the linear policy starts at 12
+        policy_public = yield self._mm.create_dynamic_settings([(meta, public)], 21)  # hence the public policy starts at 22
 
         # process both policy changes
         other.give_message(policy_linear, self._mm)

@@ -3,7 +3,7 @@ from time import time, sleep
 import logging
 
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import inlineCallbacks, returnValue, maybeDeferred
 from twisted.internet.task import deferLater
 from twisted.python.threadable import isInIOThread
 
@@ -30,7 +30,7 @@ class DebugNode(object):
        node.init_my_member()
     """
 
-    def __init__(self, testclass, dispersy, communityclass=DebugCommunity, c_master_member=None, curve=u"low"):
+    def __init__(self, testclass, dispersy, curve=u"low"):
         super(DebugNode, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
 
@@ -39,16 +39,19 @@ class DebugNode(object):
         self._my_member = self._dispersy.get_new_member(curve)
         self._my_pub_member = Member(self._dispersy, self._my_member._ec.pub(), self._my_member.database_id)
 
-        if c_master_member == None:
-            self._community = communityclass.create_community(self._dispersy, self._my_member)
-        else:
-            mm = self._dispersy.get_member(mid=c_master_member._community._master_member.mid)
-            self._community = communityclass.init_community(self._dispersy, mm, self._my_member)
-
-        self._central_node = c_master_member
+        self._central_node = None
+        self._community = None
         self._tunnel = False
         self._connection_type = u"unknown"
 
+    @inlineCallbacks
+    def initialize_community(self, communityclass=DebugCommunity, c_master_member=None):
+        self._central_node = c_master_member
+        if c_master_member == None:
+            self._community = yield communityclass.create_community(self._dispersy, self._my_member)
+        else:
+            mm = self._dispersy.get_member(mid=c_master_member._community._master_member.mid)
+            self._community = yield communityclass.init_community(self._dispersy, mm, self._my_member)
     @property
     def community(self):
         """
@@ -127,7 +130,7 @@ class DebugNode(object):
 
             # add this node to candidate list of mm
             message = self.create_introduction_request(self._central_node.my_candidate, self.lan_address, self.wan_address, False, u"unknown", None, 1, 1)
-            yield self._central_node.give_message(message, self)
+            self._central_node.give_message(message, self)
 
             # remove introduction responses from socket
             messages = yield self.receive_messages(names=[u'dispersy-introduction-response'])
@@ -385,8 +388,9 @@ class DebugNode(object):
         self.give_packets(packets, other)
 
     @blocking_call_on_reactor_thread
+    @inlineCallbacks
     def take_step(self):
-        self._community.take_step()
+        yield self._community.take_step()
 
     @blocking_call_on_reactor_thread
     def claim_global_time(self):
@@ -396,16 +400,19 @@ class DebugNode(object):
     def get_resolution_policy(self, meta, global_time):
         return self._community.timeline.get_resolution_policy(meta, global_time)
 
+    @inlineCallbacks
     def call(self, func, *args, **kargs):
         # TODO(emilon): timeout is not supported anymore, clean the tests so they don't pass the named argument.
         if isInIOThread():
-            return func(*args, **kargs)
+            func_result = yield maybeDeferred(func, *args, **kargs)
+            returnValue(func_result)
         else:
-            return blockingCallFromThread(reactor, func, *args, **kargs)
+            returnValue(blockingCallFromThread(reactor, func, *args, **kargs))
 
     @blocking_call_on_reactor_thread
+    @inlineCallbacks
     def store(self, messages):
-        self._dispersy._store(messages)
+        yield self._dispersy._store(messages)
 
     @blocking_call_on_reactor_thread
     def create_authorize(self, permission_triplets, global_time=None, sequence_number=None):

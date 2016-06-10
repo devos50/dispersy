@@ -10,6 +10,9 @@
 from itertools import combinations, islice
 from time import time
 
+from nose.twistedtools import deferred
+from twisted.internet.defer import inlineCallbacks, returnValue
+
 from ..candidate import CANDIDATE_ELIGIBLE_DELAY
 from ..tracker.community import TrackerCommunity
 from ..util import blocking_call_on_reactor_thread
@@ -477,6 +480,7 @@ class TestCandidates(DispersyTestFunc):
         return [candidate for flags, candidate in zip(all_flags, candidates) if filter_func(flags, candidate)]
 
     @blocking_call_on_reactor_thread
+    @inlineCallbacks
     def check_candidates(self, all_flags):
         assert isinstance(all_flags, list)
         assert all(isinstance(flags, str) for flags in all_flags)
@@ -502,7 +506,7 @@ class TestCandidates(DispersyTestFunc):
         assert isinstance(max_calls, int)
         assert isinstance(max_iterations, int)
         assert len(all_flags) < max_iterations
-        community = NoBootstrapDebugCommunity.create_community(self._dispersy, self._mm._my_member)
+        community = yield NoBootstrapDebugCommunity.create_community(self._dispersy, self._mm._my_member)
         candidates = self.create_candidates(community, all_flags)
 
         # yield_candidates
@@ -549,25 +553,26 @@ class TestCandidates(DispersyTestFunc):
         candidate = community.dispersy_get_walk_candidate()
         self.assertEquals(candidate, None)
 
-    @blocking_call_on_reactor_thread
-    def test_get_introduce_candidate(self, community_create_method=DebugCommunity.create_community):
-        community = community_create_method(self._dispersy, self._community._my_member)
-        candidates = self.create_candidates(community, [""] * 5)
-        expected = [None, ("127.0.0.1", 1), ("127.0.0.1", 2), ("127.0.0.1", 3), ("127.0.0.1", 4)]
-        now = time()
-        got = []
-        for candidate in candidates:
-            candidate.associate(self._dispersy.get_new_member(u"very-low"))
-            candidate.stumble(now)
-            introduce = community.dispersy_get_introduce_candidate(candidate)
-            got.append(introduce.sock_addr if introduce else None)
-        self.assertEquals(expected, got)
-
-        return community, candidates
-
-    @blocking_call_on_reactor_thread
+    @deferred(timeout=10)
+    @inlineCallbacks
     def test_tracker_get_introduce_candidate(self, community_create_method=TrackerCommunity.create_community):
-        community, candidates = self.test_get_introduce_candidate(community_create_method)
+        @inlineCallbacks
+        def get_introduce_candidate(self, community_create_method=DebugCommunity.create_community):
+            community = yield community_create_method(self._dispersy, self._community._my_member)
+            candidates = self.create_candidates(community, [""] * 5)
+            expected = [None, ("127.0.0.1", 1), ("127.0.0.1", 2), ("127.0.0.1", 3), ("127.0.0.1", 4)]
+            now = time()
+            got = []
+            for candidate in candidates:
+                candidate.associate(self._dispersy.get_new_member(u"very-low"))
+                candidate.stumble(now)
+                introduce = community.dispersy_get_introduce_candidate(candidate)
+                got.append(introduce.sock_addr if introduce else None)
+            self.assertEquals(expected, got)
+
+            returnValue((community, candidates))
+
+        community, candidates = yield get_introduce_candidate(self, community_create_method)
 
         # trackers should not prefer either stumbled or walked candidates, i.e. it should not return
         # candidate 1 more than once/in the wrong position

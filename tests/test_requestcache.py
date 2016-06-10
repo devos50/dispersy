@@ -1,6 +1,9 @@
+# THIS MUST BE IMPORTED EARLIER APPARENTLY, COSTED TONS OF TIME TO FIGURE OUT.
+# IF THIS IS NOT FIRST, THE REACTOR WILL NOT BE RUNNING AND EVERYTHING WILL CRASH AND BURN.
+from .dispersytestclass import DispersyTestFunc
+
 from ..requestcache import RequestCache, NumberCache, RandomNumberCache
 from ..util import blocking_call_on_reactor_thread
-from .dispersytestclass import DispersyTestFunc
 
 
 class TestRequestCache(DispersyTestFunc):

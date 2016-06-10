@@ -1,8 +1,12 @@
+from nose.twistedtools import deferred
+from twisted.internet.defer import inlineCallbacks
+
 from .dispersytestclass import DispersyTestFunc
 
 
 class TestTimeline(DispersyTestFunc):
 
+    @inlineCallbacks
     def test_delay_by_proof(self):
         """
         When OTHER receives a message that it has no permission for, it will send a
@@ -12,7 +16,7 @@ class TestTimeline(DispersyTestFunc):
         node.send_identity(other)
 
         # permit NODE
-        proof_msg = self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
+        proof_msg = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
                                     (node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"authorize")])
 
         # NODE creates message
@@ -36,6 +40,7 @@ class TestTimeline(DispersyTestFunc):
         # must have been stored in the database
         other.assert_is_stored(tmessage)
 
+    @inlineCallbacks
     def test_missing_proof(self):
         """
         When OTHER receives a dispersy-missing-proof message it needs to find and send the proof.
@@ -44,12 +49,12 @@ class TestTimeline(DispersyTestFunc):
         node.send_identity(other)
 
         # permit NODE
-        authorize = self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
+        authorize = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
                                                (node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"authorize")])
         node.give_message(authorize, self._mm)
 
         protected_text = node.create_protected_full_sync_text("Protected message", 42)
-        node.store([protected_text])
+        yield node.store([protected_text])
 
         # OTHER pretends to received the protected message and requests the proof
         node.give_message(other.create_missing_proof(node.my_member, 42), other)
@@ -61,6 +66,7 @@ class TestTimeline(DispersyTestFunc):
         authorize_permission_triplets = [(triplet[0].mid, triplet[1].name, triplet[2]) for triplet in authorize.payload.permission_triplets]
         self.assertIn(permission_triplet, authorize_permission_triplets)
 
+    @inlineCallbacks
     def test_missing_authorize_proof(self):
         """
              MASTER
@@ -78,7 +84,7 @@ class TestTimeline(DispersyTestFunc):
         node.send_identity(other)
 
         # permit NODE
-        authorize = self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
+        authorize = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
                                              (node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"authorize")])
         node.give_message(authorize, self._mm)
 

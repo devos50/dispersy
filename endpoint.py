@@ -9,6 +9,7 @@ from select import select
 from time import time
 
 from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks
 
 from .candidate import Candidate
 
@@ -232,6 +233,7 @@ class StandaloneEndpoint(Endpoint):
             # The endpoint runs on it's own thread, so we can't do a callLater here
             reactor.callFromThread(self.dispersythread_data_came_in, normal_packets, time(), cache)
 
+    @inlineCallbacks
     def dispersythread_data_came_in(self, packets, timestamp, cache=True):
         assert self._dispersy, "Should not be called before open(...)"
 
@@ -242,7 +244,7 @@ class StandaloneEndpoint(Endpoint):
                 else:
                     yield False, sock_addr, data
 
-        self._dispersy.on_incoming_packets([(Candidate(sock_addr, tunnel), data)
+        yield self._dispersy.on_incoming_packets([(Candidate(sock_addr, tunnel), data)
                                             for tunnel, sock_addr, data
                                             in strip_if_tunnel(packets)],
                                            cache,

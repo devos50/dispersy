@@ -6,6 +6,7 @@ from random import random, shuffle
 from time import time
 
 from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks
 from twisted.internet.task import LoopingCall
 
 from ..authentication import MemberAuthentication, NoAuthentication
@@ -484,6 +485,7 @@ class DiscoveryCommunity(Community):
             self.community.send_introduction_request(self.requested_candidate, allow_sync=self.allow_sync)
             self.community.peer_cache.inc_num_fails(self.requested_candidate)
 
+    @inlineCallbacks
     def create_introduction_request(self, destination, allow_sync, forward=True, is_fast_walker=False):
         assert isinstance(destination, WalkCandidate), [type(destination), destination]
 
@@ -495,7 +497,7 @@ class DiscoveryCommunity(Community):
             send = self.create_similarity_request(destination, allow_sync=allow_sync)
 
         if not send:
-            self.send_introduction_request(destination, allow_sync=allow_sync)
+            yield self.send_introduction_request(destination, allow_sync=allow_sync)
 
     def create_similarity_request(self, destination, allow_sync=True):
         payload = self.my_preferences()[:self.max_prefs]
@@ -597,6 +599,7 @@ class DiscoveryCommunity(Community):
 
             yield message
 
+    @inlineCallbacks
     def on_similarity_response(self, messages):
         for message in messages:
             # Update possible taste buddies.
@@ -634,16 +637,17 @@ class DiscoveryCommunity(Community):
             self.add_possible_taste_buddies(possibles)
 
             destination, introduce_me_to = self.get_most_similar(w_candidate)
-            self.send_introduction_request(destination, introduce_me_to, request.allow_sync)
+            yield self.send_introduction_request(destination, introduce_me_to, request.allow_sync)
 
             self.reply_packet_size += len(message.packet)
 
+    @inlineCallbacks
     def send_introduction_request(self, destination, introduce_me_to=None, allow_sync=True):
         assert isinstance(destination, WalkCandidate), [type(destination), destination]
         assert not introduce_me_to or isinstance(introduce_me_to, str), type(introduce_me_to)
 
         extra_payload = [introduce_me_to]
-        super(DiscoveryCommunity, self).create_introduction_request(destination, allow_sync, extra_payload=extra_payload)
+        yield super(DiscoveryCommunity, self).create_introduction_request(destination, allow_sync, extra_payload=extra_payload)
 
         self._logger.debug("DiscoveryCommunity: sending introduction-request to %s (%s,%s)", destination,
                            introduce_me_to.encode("HEX") if introduce_me_to else '', allow_sync)
