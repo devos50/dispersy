@@ -165,8 +165,7 @@ class StormDBManager:
             # connection = Connection(self._database)
             return self.connection.execute(query, arguments).get_all()
 
-        # return self.db_lock.run(_fetchall, self, query, arguments)
-        return _fetchall(self, query, arguments)
+        return self.db_lock.run(_fetchall, self, query, arguments)
 
     def insert(self, table_name, **kwargs):
         """
