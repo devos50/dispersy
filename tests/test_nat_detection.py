@@ -1,5 +1,7 @@
 from time import time
 
+from twisted.internet.defer import inlineCallbacks
+
 from .dispersytestclass import DispersyTestFunc
 from ..util import call_on_reactor_thread, address_is_lan_without_netifaces
 
@@ -123,6 +125,7 @@ class TestAddressEstimation(DispersyTestFunc):
         self.assertFalse(address_is_lan_without_netifaces("123.123.123.123"))
         self.assertFalse(address_is_lan_without_netifaces("42.42.42.42"))
 
+    @inlineCallbacks
     def test_estimate_addresses_within_LAN(self):
         """
         Tests the estimate_lan_and_wan_addresses method while NODE and OTHER are within the same LAN.
@@ -132,13 +135,13 @@ class TestAddressEstimation(DispersyTestFunc):
         this should remain unchanged.
         """
         node, other = self.create_nodes(2)
-        node.send_identity(other)
+        yield node.send_identity(other)
 
         incorrect_LAN = ("0.0.0.0", 0)
         incorrect_WAN = ("0.0.0.0", 0)
 
         # NODE contacts OTHER with incorrect addresses
-        other.give_message(node.create_introduction_request(other.my_candidate,
+        yield other.give_message(node.create_introduction_request(other.my_candidate,
                                                             incorrect_LAN,
                                                             incorrect_WAN,
                                                             True,

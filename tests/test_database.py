@@ -2,6 +2,9 @@ import os
 import shutil
 from unittest import TestCase
 
+from nose.tools import raises
+from twisted.internet.defer import inlineCallbacks
+
 from ..dispersydatabase import DispersyDatabase
 
 
@@ -28,29 +31,32 @@ class TestDatabase(TestCase):
         if os.path.exists(self.TMP_DATA_DIR):
             shutil.rmtree(self.TMP_DATA_DIR, ignore_errors=True)
 
-
-
+    @raises(RuntimeError)
+    @inlineCallbacks
     def test_unsupported_database_version(self):
         minimum_version_path = os.path.abspath(os.path.join(self.TEST_DATA_DIR, u"dispersy_v1.db"))
         tmp_path = os.path.join(self.TMP_DATA_DIR, u"dispersy.db")
         shutil.copyfile(minimum_version_path, tmp_path)
 
         database = DispersyDatabase("sqlite:%s" % tmp_path)
-        self.assertRaises(RuntimeError, database.open)
+        yield database.open()
 
+    @inlineCallbacks
     def test_upgrade_16_to_latest(self):
         minimum_version_path = os.path.abspath(os.path.join(self.TEST_DATA_DIR, u"dispersy_v16.db"))
         tmp_path = os.path.join(self.TMP_DATA_DIR, u"dispersy.db")
         shutil.copyfile(minimum_version_path, tmp_path)
 
         database = DispersyDatabase("sqlite:%s" % tmp_path)
-        database.open()
+        yield database.open()
         self.assertEqual(database.database_version, 21)
 
+    @raises(RuntimeError)
+    @inlineCallbacks
     def test_upgrade_version_too_high(self):
         minimum_version_path = os.path.abspath(os.path.join(self.TEST_DATA_DIR, u"dispersy_v1337.db"))
         tmp_path = os.path.join(self.TMP_DATA_DIR, u"dispersy.db")
         shutil.copyfile(minimum_version_path, tmp_path)
 
         database = DispersyDatabase("sqlite:%s" % tmp_path)
-        self.assertRaises(RuntimeError, database.open)
+        yield database.open()

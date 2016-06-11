@@ -131,7 +131,7 @@ class Community(TaskManager):
         master = dispersy.get_new_member(u"high")
 
         # new community instance
-        community = cls.init_community(dispersy, master, my_member, *args, **kargs)
+        community = yield cls.init_community(dispersy, master, my_member, *args, **kargs)
 
         # create the dispersy-identity for the master member
         yield community.create_identity(sign_with_master=True)
@@ -173,19 +173,20 @@ class Community(TaskManager):
         returnValue(community)
 
     @classmethod
+    @inlineCallbacks
     def get_master_members(cls, dispersy):
         from .dispersy import Dispersy
         assert isinstance(dispersy, Dispersy), type(dispersy)
         assert isInIOThread()
         logger.debug("retrieving all master members owning %s communities", cls.get_classification())
-        fetchall = dispersy.database.stormdb.fetchall
-        return [dispersy.get_member(public_key=str(public_key)) if public_key else dispersy.get_member(mid=str(mid))
-                for mid, public_key,
-                in fetchall(u"SELECT m.mid, m.public_key FROM community AS c JOIN member AS m ON m.id = c.master"
+        communities = yield dispersy.database.stormdb.fetchall((u"SELECT m.mid, m.public_key FROM community AS c JOIN member AS m ON m.id = c.master"
                                 u" WHERE c.classification = ?",
-                                (cls.get_classification(),))]
+                                (cls.get_classification(),)))
+        returnValue([dispersy.get_member(public_key=str(public_key)) if public_key else dispersy.get_member(mid=str(mid))
+                for mid, public_key, in communities])
 
     @classmethod
+    @inlineCallbacks
     def init_community(cls, dispersy, master, my_member, *args, **kargs):
         """
         Initializes a new community, using master as the identifier and my_member as the
@@ -224,9 +225,9 @@ class Community(TaskManager):
         # add to dispersy
         dispersy.attach_community(community)
 
-        community.initialize(*args, **kargs)
+        yield community.initialize(*args, **kargs)
 
-        return community
+        returnValue(community)
 
     def __init__(self, dispersy, master, my_member):
         """
@@ -304,6 +305,7 @@ class Community(TaskManager):
         self._fast_steps_taken = 0
         self._sync_cache = None
 
+    @inlineCallbacks
     def initialize(self):
         assert isInIOThread()
         self._logger.info("initializing:  %s", self.get_classification())
@@ -341,7 +343,7 @@ class Community(TaskManager):
         assert self._my_member.private_key, [self._database_id, self._my_member.database_id, self._my_member.private_key]
         if not self._master_member.public_key and self.dispersy_enable_candidate_walker and self.dispersy_auto_download_master_member:
             self.register_task("download master member identity",
-                               LoopingCall(self._download_master_member_identity),
+                               LoopingCall(self._download_master_member_identity), # TODO(Laurens): _download_master_member_identity returns a deferred, is that ok?
                                delay=0, interval=DOWNLOAD_MM_PK_INTERVAL)
 
         # define all available messages
@@ -354,7 +356,8 @@ class Community(TaskManager):
 
         # batched insert
         update_list = []
-        for database_id, name, priority, direction in self._dispersy.database.stormdb.fetchall(u"SELECT id, name, priority, direction FROM meta_message WHERE community = ?", (self._database_id,)):
+        meta_messages = yield self._dispersy.database.stormdb.fetchall(u"SELECT id, name, priority, direction FROM meta_message WHERE community = ?", (self._database_id,))
+        for database_id, name, priority, direction in meta_messages:
             meta_message_info = self.meta_message_cache.get(name)
             if meta_message_info:
                 if priority != meta_message_info["priority"] or direction != meta_message_info["direction"]:
@@ -374,7 +377,8 @@ class Community(TaskManager):
             self._dispersy.database.stormdb.executemany(u"INSERT INTO meta_message (community, name, priority, direction) VALUES (?, ?, ?, ?)",
                 insert_list)
 
-            for database_id, name in self._dispersy.database.stormdb.fetchall(u"SELECT id, name FROM meta_message WHERE community = ?", (self._database_id,)):
+            meta_messages = yield self._dispersy.database.stormdb.fetchall(u"SELECT id, name FROM meta_message WHERE community = ?", (self._database_id,))
+            for database_id, name in meta_messages:
                 self._meta_messages[name]._database_id = database_id  # cleanup pre-fetched values
         self.meta_message_cache = None
 
@@ -394,7 +398,8 @@ class Community(TaskManager):
         self._logger.debug("global time:   %d", self._global_time)
 
         # the sequence numbers
-        for current_sequence_number, name in self._dispersy.database.stormdb.fetchall(u"SELECT MAX(sync.sequence), meta_message.name FROM sync, meta_message WHERE sync.meta_message = meta_message.id AND sync.member = ? AND meta_message.community = ? GROUP BY meta_message.name", (self._my_member.database_id, self.database_id)):
+        sequence_messages = yield self._dispersy.database.stormdb.fetchall(u"SELECT MAX(sync.sequence), meta_message.name FROM sync, meta_message WHERE sync.meta_message = meta_message.id AND sync.member = ? AND meta_message.community = ? GROUP BY meta_message.name", (self._my_member.database_id, self.database_id))
+        for current_sequence_number, name in sequence_messages:
             if current_sequence_number:
                 self._meta_messages[name].distribution._current_sequence_number = current_sequence_number
 
@@ -413,7 +418,7 @@ class Community(TaskManager):
 
         # initial timeline.  the timeline will keep track of member permissions
         self._timeline = Timeline(self)
-        self._initialize_timeline()
+        yield self._initialize_timeline()
 
         # random seed, used for sync range
         self._random = Random()
@@ -425,7 +430,7 @@ class Community(TaskManager):
         self._walk_candidates = self._iter_categories([u'walk', u'stumble', u'intro'])
 
         # statistics...
-        self._statistics.update()
+        yield self._statistics.update()
 
         # turn on/off pruning
         self._do_pruning = any(isinstance(meta.distribution, SyncDistribution) and
@@ -443,11 +448,11 @@ class Community(TaskManager):
             self.create_identity()
 
         # check/sanity check the database
-        self.dispersy_check_database()
+        yield self.dispersy_check_database()
         from sys import argv
         if "--sanity-check" in argv:
             try:
-                self.dispersy.sanity_check(self)
+                yield self.dispersy.sanity_check(self)
             except ValueError:
                 self._logger.exception("sanity check fail for %s", self)
 
@@ -478,6 +483,7 @@ class Community(TaskManager):
         """
         return self._statistics
 
+    @inlineCallbacks
     def _download_master_member_identity(self):
         assert not self._master_member.public_key
         self._logger.debug("using dummy master member")
@@ -496,7 +502,7 @@ class Community(TaskManager):
                 for candidate in islice(self.dispersy_yield_verified_candidates(), 1):
                     if candidate:
                         self._logger.debug("%s asking for master member from %s", self._cid.encode("HEX"), candidate)
-                        self.create_missing_identity(candidate, self._master_member)
+                        yield self.create_missing_identity(candidate, self._master_member)
 
     def _initialize_meta_messages(self):
         assert isinstance(self._meta_messages, dict)
@@ -515,6 +521,7 @@ class Community(TaskManager):
                         "when sync is enabled the interval should be greater than the walking frequency. "
                         " otherwise you are likely to receive duplicate packets [%s]", meta_message.name)
 
+    @inlineCallbacks
     def _initialize_timeline(self):
         mapping = {}
         for name in [u"dispersy-authorize", u"dispersy-revoke", u"dispersy-dynamic-settings"]:
@@ -525,9 +532,10 @@ class Community(TaskManager):
                 self._logger.warning("unable to load permissions from database [could not obtain %s]", name)
 
         if mapping:
-            for packet, in self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync WHERE meta_message IN (" + ", ".join("?" for _ in mapping) + ") ORDER BY global_time, packet",
-                                                                mapping.keys()):
-                message = self._dispersy.convert_packet_to_message(str(packet), self, verify=False)
+            sync_packets = yield self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync WHERE meta_message IN (" + ", ".join("?" for _ in mapping) + ") ORDER BY global_time, packet",
+                                                                mapping.keys())
+            for packet, in sync_packets:
+                message = yield self._dispersy.convert_packet_to_message(str(packet), self, verify=False)
                 if message:
                     self._logger.debug("processing %s", message.name)
                     mapping[message.database_id]([message], initializing=True)
@@ -667,8 +675,10 @@ class Community(TaskManager):
         return (1500 - 60 - 8 - 51 - self._my_member.signature_length - 21 - 30) * 8
 
     @property
+    @inlineCallbacks
     def dispersy_sync_bloom_filter_strategy(self):
-        return self._dispersy_claim_sync_bloom_filter_largest
+        res = self._dispersy_claim_sync_bloom_filter_largest
+        returnValue(res)
 
     @property
     def dispersy_sync_skip_enable(self):
@@ -707,6 +717,7 @@ class Community(TaskManager):
                 self._logger.debug("%s] %d out of %d were part of the cached bloomfilter",
                                    self._cid.encode("HEX"), cached, len(messages))
 
+    @inlineCallbacks
     def dispersy_claim_sync_bloom_filter(self, request_cache):
         """
         Returns a (time_low, time_high, modulo, offset, bloom_filter) or None.
@@ -728,7 +739,7 @@ class Community(TaskManager):
                     self._logger.debug("%s reuse #%d (packets received: %d; %s)",
                                        self._cid.encode("HEX"), cache.times_used, cache.responses_received,
                                        hex(cache.bloom_filter._filter))
-                    return cache.time_low, cache.time_high, cache.modulo, cache.offset, cache.bloom_filter
+                    returnValue((cache.time_low, cache.time_high, cache.modulo, cache.offset, cache.bloom_filter))
 
             elif self._sync_cache.times_used == 0:
                 # Still no updates, gradually increment the skipping probability one notch
@@ -744,9 +755,9 @@ class Community(TaskManager):
                 self._logger.debug("skip: random() was <%f", self._SKIP_CURVE_STEPS[self._sync_cache_skip_count - 1])
                 self._statistics.sync_bloom_skip += 1
                 self._sync_cache = None
-                return None
+                returnValue(None)
 
-        sync = self.dispersy_sync_bloom_filter_strategy(request_cache)
+        sync = yield self.dispersy_sync_bloom_filter_strategy(request_cache)
         if sync:
             self._sync_cache = SyncCache(*sync)
             self._sync_cache.candidate = request_cache.helper_candidate
@@ -756,11 +767,12 @@ class Community(TaskManager):
                                self._statistics.sync_bloom_reuse, self._statistics.sync_bloom_new,
                                round(1.0 * self._statistics.sync_bloom_reuse / self._statistics.sync_bloom_new, 2))
 
-        return sync
+        returnValue(sync)
 
     # instead of pivot + capacity, compare pivot - capacity and pivot + capacity to see which globaltime range is largest
     @runtime_duration_warning(0.5)
     @attach_runtime_statistics(u"{0.__class__.__name__}.{function_name}")
+    @inlineCallbacks
     def _dispersy_claim_sync_bloom_filter_largest(self, request_cache):
         if __debug__:
             t1 = time()
@@ -782,12 +794,12 @@ class Community(TaskManager):
 
             if from_gbtime > 1 and self._nrsyncpackets >= capacity:
                 # use from_gbtime -1/+1 to include from_gbtime
-                right, rightdata = self._select_bloomfilter_range(request_cache, syncable_messages, from_gbtime - 1, capacity, True)
+                right, rightdata = yield self._select_bloomfilter_range(request_cache, syncable_messages, from_gbtime - 1, capacity, True)
 
                 # if right did not get to capacity, then we have less than capacity items in the database
                 # skip left
                 if right[2] == capacity:
-                    left, leftdata = self._select_bloomfilter_range(request_cache, syncable_messages, from_gbtime + 1, capacity, False)
+                    left, leftdata = yield self._select_bloomfilter_range(request_cache, syncable_messages, from_gbtime + 1, capacity, False)
                     left_range = (left[1] or self.global_time) - left[0]
                     right_range = (right[1] or self.global_time) - right[0]
 
@@ -810,7 +822,7 @@ class Community(TaskManager):
 
                 bloomfilter_range = [1, acceptable_global_time]
 
-                data, fixed = self._select_and_fix(request_cache, syncable_messages, 0, capacity, True)
+                data, fixed = yield self._select_and_fix(request_cache, syncable_messages, 0, capacity, True)
                 if len(data) > 0 and fixed:
                     bloomfilter_range[1] = data[-1][0]
                     self._nrsyncpackets = capacity + 1
@@ -828,17 +840,18 @@ class Community(TaskManager):
                     self._logger.debug("%s took %f (fakejoin %f, rangeselect %f, dataselect %f, bloomfill, %f",
                                  self.cid.encode("HEX"), time() - t1, t2 - t1, t3 - t2, t4 - t3, time() - t4)
 
-                return (min(bloomfilter_range[0], acceptable_global_time), min(bloomfilter_range[1], acceptable_global_time), 1, 0, bloom)
+                returnValue((min(bloomfilter_range[0], acceptable_global_time), min(bloomfilter_range[1], acceptable_global_time), 1, 0, bloom))
 
             if __debug__:
                 self._logger.debug("%s no messages to sync", self.cid.encode("HEX"))
 
         elif __debug__:
             self._logger.debug("%s NOT syncing no syncable messages", self.cid.encode("HEX"))
-        return (1, acceptable_global_time, 1, 0, BloomFilter(8, 0.1, prefix='\x00'))
+        returnValue((1, acceptable_global_time, 1, 0, BloomFilter(8, 0.1, prefix='\x00')))
 
+    @inlineCallbacks
     def _select_bloomfilter_range(self, request_cache, syncable_messages, global_time, to_select, higher=True):
-        data, fixed = self._select_and_fix(request_cache, syncable_messages, global_time, to_select, higher)
+        data, fixed = yield self._select_and_fix(request_cache, syncable_messages, global_time, to_select, higher)
 
         lowerfixed = True
         higherfixed = True
@@ -849,10 +862,10 @@ class Community(TaskManager):
             to_select = to_select - len(data)
             if to_select > 25:
                 if higher:
-                    lowerdata, lowerfixed = self._select_and_fix(request_cache, syncable_messages, global_time + 1, to_select, False)
+                    lowerdata, lowerfixed = yield self._select_and_fix(request_cache, syncable_messages, global_time + 1, to_select, False)
                     data = lowerdata + data
                 else:
-                    higherdata, higherfixed = self._select_and_fix(request_cache, syncable_messages, global_time - 1, to_select, True)
+                    higherdata, higherfixed = yield self._select_and_fix(request_cache, syncable_messages, global_time - 1, to_select, True)
                     data = data + higherdata
 
         bloomfilter_range = [data[0][0], data[-1][0], len(data)]
@@ -877,15 +890,17 @@ class Community(TaskManager):
             if not higherfixed:
                 bloomfilter_range[1] = self.acceptable_global_time
 
-        return bloomfilter_range, data
+        returnValue((bloomfilter_range, data))
 
+    @inlineCallbacks
+    # TODO(Laurens): request_cache is not used.
     def _select_and_fix(self, request_cache, syncable_messages, global_time, to_select, higher=True):
         assert isinstance(syncable_messages, unicode)
         if higher:
-            data = self._dispersy.database.stormdb.fetchall(u"SELECT global_time, packet FROM sync WHERE meta_message IN (%s) AND undone = 0 AND global_time > ? ORDER BY global_time ASC LIMIT ?" % (syncable_messages),
+            data = yield self._dispersy.database.stormdb.fetchall(u"SELECT global_time, packet FROM sync WHERE meta_message IN (%s) AND undone = 0 AND global_time > ? ORDER BY global_time ASC LIMIT ?" % (syncable_messages),
                        (global_time, to_select + 1))
         else:
-            data = self._dispersy.database.stormdb.fetchall(u"SELECT global_time, packet FROM sync WHERE meta_message IN (%s) AND undone = 0 AND global_time < ? ORDER BY global_time DESC LIMIT ?" % (syncable_messages),
+            data = yield self._dispersy.database.stormdb.fetchall(u"SELECT global_time, packet FROM sync WHERE meta_message IN (%s) AND undone = 0 AND global_time < ? ORDER BY global_time DESC LIMIT ?" % (syncable_messages),
                        (global_time, to_select + 1))
 
         fixed = False
@@ -901,11 +916,13 @@ class Community(TaskManager):
         if not higher:
             data.reverse()
 
-        return data, fixed
+        returnValue((data, fixed))
 
     # instead of pivot + capacity, compare pivot - capacity and pivot + capacity to see which globaltime range is largest
     @runtime_duration_warning(0.5)
     @attach_runtime_statistics(u"{0.__class__.__name__}.{function_name}")
+    @inlineCallbacks
+    # TODO(Laurens): This method is never used
     def _dispersy_claim_sync_bloom_filter_modulo(self, request_cache):
         syncable_messages = u", ".join(unicode(meta.database_id) for meta in self._meta_messages.itervalues() if isinstance(meta.distribution, SyncDistribution) and meta.distribution.priority > 32)
         if syncable_messages:
@@ -916,22 +933,24 @@ class Community(TaskManager):
             modulo = int(ceil(self._nrsyncpackets / float(capacity)))
             if modulo > 1:
                 offset = randint(0, modulo - 1)
-                packets = list(str(packet) for packet, in self._dispersy.database.stormdb.fetchall(u"SELECT sync.packet FROM sync WHERE meta_message IN (%s) AND sync.undone = 0 AND (sync.global_time + ?) %% ? = 0" % syncable_messages, (offset, modulo)))
+                sync_packets = yield self._dispersy.database.stormdb.fetchall(u"SELECT sync.packet FROM sync WHERE meta_message IN (%s) AND sync.undone = 0 AND (sync.global_time + ?) %% ? = 0" % syncable_messages, (offset, modulo))
+                packets = list(str(packet) for packet, in sync_packets)
             else:
                 offset = 0
                 modulo = 1
-                packets = list(str(packet) for packet, in self._dispersy.database.stormdb.fetchall(u"SELECT sync.packet FROM sync WHERE meta_message IN (%s) AND sync.undone = 0" % syncable_messages))
+                sync_packets = yield self._dispersy.database.stormdb.fetchall(u"SELECT sync.packet FROM sync WHERE meta_message IN (%s) AND sync.undone = 0" % syncable_messages)
+                packets = list(str(packet) for packet, in sync_packets)
 
             bloom.add_keys(packets)
 
             self._logger.debug("%s syncing %d-%d, nr_packets = %d, capacity = %d, totalnr = %d",
                          self.cid.encode("HEX"), modulo, offset, self._nrsyncpackets, capacity, self._nrsyncpackets)
 
-            return (1, self.acceptable_global_time, modulo, offset, bloom)
+            returnValue((1, self.acceptable_global_time, modulo, offset, bloom))
 
         else:
             self._logger.debug("%s NOT syncing no syncable messages", self.cid.encode("HEX"))
-        return (1, self.acceptable_global_time, 1, 0, BloomFilter(8, 0.1, prefix='\x00'))
+        returnValue((1, self.acceptable_global_time, 1, 0, BloomFilter(8, 0.1, prefix='\x00')))
 
     @property
     def dispersy_sync_response_limit(self):
@@ -1096,13 +1115,12 @@ class Community(TaskManager):
                             u"DELETE FROM sync WHERE meta_message = ? AND global_time <= ?",
                             (meta.database_id, self._global_time - meta.distribution.pruning.prune_threshold))
 
+    @inlineCallbacks
     def dispersy_check_database(self):
         """
         Called each time after the community is loaded and attached to Dispersy.
         """
-        # TODO(Laurens): Move this function to the storm db manager or
-        # keep it in dispersydatabase manager but make sure it uses storm.
-        self._database_version = self._dispersy.database.check_community_database(self, self._database_version)
+        self._database_version = yield self._dispersy.database.check_community_database(self, self._database_version)
 
     def get_conversion_for_packet(self, packet):
         """
@@ -1672,7 +1690,7 @@ class Community(TaskManager):
                     LastSyncDistribution(synchronization_direction=u"ASC", priority=16, history_size=1),
                     CommunityDestination(node_count=0),
                     IdentityPayload(),
-                    self._generic_timeline_check,
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                     self.on_identity),
             Message(self, u"dispersy-signature-request",
                     NoAuthentication(),
@@ -1696,7 +1714,7 @@ class Community(TaskManager):
                     FullSyncDistribution(enable_sequence_number=True, synchronization_direction=u"ASC", priority=128),
                     CommunityDestination(node_count=10),
                     AuthorizePayload(),
-                    self._generic_timeline_check,
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                     self.on_authorize),
             Message(self, u"dispersy-revoke",
                     MemberAuthentication(),
@@ -1704,15 +1722,15 @@ class Community(TaskManager):
                     FullSyncDistribution(enable_sequence_number=True, synchronization_direction=u"ASC", priority=128),
                     CommunityDestination(node_count=10),
                     RevokePayload(),
-                    self._generic_timeline_check,
-                    self.on_revoke),
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
+                    self.on_revoke), #TODO(Laurens): this now returns a deferred, is that ok?
             Message(self, u"dispersy-undo-own",
                     MemberAuthentication(),
                     PublicResolution(),
                     FullSyncDistribution(enable_sequence_number=True, synchronization_direction=u"ASC", priority=128),
                     CommunityDestination(node_count=10),
                     UndoPayload(),
-                    self.check_undo,
+                    self.check_undo, #TODO(Laurens): this now returns a deferred, is that ok?
                     self.on_undo),
             Message(self, u"dispersy-undo-other",
                     MemberAuthentication(),
@@ -1720,7 +1738,7 @@ class Community(TaskManager):
                     FullSyncDistribution(enable_sequence_number=True, synchronization_direction=u"ASC", priority=128),
                     CommunityDestination(node_count=10),
                     UndoPayload(),
-                    self.check_undo,
+                    self.check_undo, #TODO(Laurens): this now returns a deferred, is that ok?
                     self.on_undo),
             Message(self, u"dispersy-destroy-community",
                     MemberAuthentication(),
@@ -1728,16 +1746,16 @@ class Community(TaskManager):
                     FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=192),
                     CommunityDestination(node_count=50),
                     DestroyCommunityPayload(),
-                    self._generic_timeline_check,
-                    self.on_destroy_community),
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
+                    self.on_destroy_community), # TODO(Laurens) This now returns a deferred, is that ok?
             Message(self, u"dispersy-dynamic-settings",
                     MemberAuthentication(),
                     LinearResolution(),
                     FullSyncDistribution(enable_sequence_number=True, synchronization_direction=u"DESC", priority=191),
                     CommunityDestination(node_count=10),
                     DynamicSettingsPayload(),
-                    self._generic_timeline_check,
-                    self.on_dynamic_settings),
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
+                    self.on_dynamic_settings), #TODO(Laurens): this now returns a deferred, is that ok?
 
             #
             # when something is missing, a dispersy-missing-... message can be used to request
@@ -1751,8 +1769,8 @@ class Community(TaskManager):
                     DirectDistribution(),
                     CandidateDestination(),
                     MissingIdentityPayload(),
-                    self._generic_timeline_check,
-                    self.on_missing_identity),
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
+                    self.on_missing_identity), #TODO(Laurens) on_missing_identity now returns a deferred, is that ok?
 
             # when we are missing one or more SyncDistribution messages in a certain sequence
             Message(self, u"dispersy-missing-sequence",
@@ -1761,8 +1779,8 @@ class Community(TaskManager):
                     DirectDistribution(),
                     CandidateDestination(),
                     MissingSequencePayload(),
-                    self._generic_timeline_check,
-                    self.on_missing_sequence,
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
+                    self.on_missing_sequence, # TODO(Laurens) now returns a deferred, is that ok?
                     batch=BatchConfiguration(max_window=0.1)),
 
             # when we have a reference to a message that we do not have.  a reference consists
@@ -1773,8 +1791,8 @@ class Community(TaskManager):
                     DirectDistribution(),
                     CandidateDestination(),
                     MissingMessagePayload(),
-                    self._generic_timeline_check,
-                    self.on_missing_message),
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
+                    self.on_missing_message), #TODO(Laurens): this now returns a deferred, is that ok?
 
             # when we might be missing a dispersy-authorize message
             Message(self, u"dispersy-missing-proof",
@@ -1783,8 +1801,8 @@ class Community(TaskManager):
                     DirectDistribution(),
                     CandidateDestination(),
                     MissingProofPayload(),
-                    self._generic_timeline_check,
-                    self.on_missing_proof)
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
+                    self.on_missing_proof) # TODO(Laurens) this now returns a deferred, is that ok?
         ]
 
         if self.dispersy_enable_candidate_walker_responses:
@@ -1795,7 +1813,7 @@ class Community(TaskManager):
                                      CandidateDestination(),
                                      IntroductionRequestPayload(),
                                      self.check_introduction_request,
-                                     self.on_introduction_request),
+                                     self.on_introduction_request), # TODO(Laurens) on_introduciton_request now returns a deferred, is that ok?
                              Message(self, u"dispersy-introduction-response",
                                      MemberAuthentication(),
                                      PublicResolution(),
@@ -1811,7 +1829,7 @@ class Community(TaskManager):
                                      CandidateDestination(),
                                      PunctureRequestPayload(),
                                      self.check_puncture_request,
-                                     self.on_puncture_request),
+                                     self.on_puncture_request), #TODO(Laurens): this now returns a deferred, is that ok?
                              Message(self, u"dispersy-puncture",
                                      MemberAuthentication(),
                                      PublicResolution(),
@@ -1871,6 +1889,7 @@ class Community(TaskManager):
             if has_identity:
                 return member
 
+    @inlineCallbacks
     def _generic_timeline_check(self, messages):
         meta = messages[0].meta
         if isinstance(meta.authentication, NoAuthentication):
@@ -1887,7 +1906,7 @@ class Community(TaskManager):
                     # reply with all proofs when message is rejected and has dynamicresolution
                     # in order to "fix" differences in dynamic resolution policy between us and the candidate
                     if isinstance(meta.resolution, DynamicResolution):
-                        self._dispersy._send_packets([message.candidate], [proof.packet for proof in proofs], self, "-caused by dynamic resolution-")
+                        yield self._dispersy._send_packets([message.candidate], [proof.packet for proof in proofs], self, "-caused by dynamic resolution-")
 
                     yield DelayMessageByProof(message)
 
@@ -1899,6 +1918,7 @@ class Community(TaskManager):
         elif isinstance(drop, DropMessage):
             self._statistics.increase_msg_count(u"drop", u"drop_message:%s" % drop)
 
+    @inlineCallbacks
     def _delay(self, match_info, delay, packet, candidate):
         assert len(match_info) == 4, match_info
         assert not match_info[0] or isinstance(match_info[0], unicode), type(match_info[0])
@@ -1923,7 +1943,7 @@ class Community(TaskManager):
             self._delayed_value[delay].append(unwrapped_key)
 
         if send_request:
-            delay.send_request(self, candidate)
+            yield delay.send_request(self, candidate)
             self._statistics.increase_delay_msg_count(u"send")
 
         self._logger.debug("delay a %d byte packet/message (%s) from %s", len(packet), delay, candidate)
@@ -2093,7 +2113,7 @@ class Community(TaskManager):
                 self._drop(drop, packet, candidate)
 
             except DelayPacket as delay:
-                self._dispersy._delay(delay, packet, candidate)
+                yield self._dispersy._delay(delay, packet, candidate)
 
         assert all(isinstance(message, Message.Implementation) for message in messages), "convert_batch_into_messages must return only Message.Implementation instances"
         assert all(message.meta == meta for message in messages), "All Message.Implementation instances must be in the same batch"
@@ -2153,14 +2173,15 @@ class Community(TaskManager):
         assert all(message.community == messages[0].community for message in messages)
         assert all(message.meta == messages[0].meta for message in messages)
 
+        @inlineCallbacks
         def _filter_fail(message):
             if isinstance(message, DelayMessage):
-                self._dispersy._delay(message, message.delayed.packet, message.delayed.candidate)
-                return False
+                yield self._dispersy._delay(message, message.delayed.packet, message.delayed.candidate)
+                returnValue(False)
             elif isinstance(message, DropMessage):
                 self._drop(message, message.dropped.packet, message.dropped.candidate)
-                return False
-            return True
+                returnValue(False)
+            returnValue(True)
 
         meta = messages[0].meta
         debug_count = len(messages)
@@ -2174,7 +2195,12 @@ class Community(TaskManager):
         assert all(isinstance(message, (Message.Implementation, DropMessage, DelayMessage)) for message in messages)
 
         # handle/remove DropMessage and DelayMessage instances
-        messages = [message for message in messages if _filter_fail(message)]
+        messages = []
+        for message in messages:
+            filter_fail_result = yield _filter_fail(message)
+            if filter_fail_result:
+                messages.append(message)
+
         if not messages:
             returnValue(0)
 
@@ -2197,7 +2223,12 @@ class Community(TaskManager):
                                  meta.check_callback)
 
         # handle/remove DropMessage and DelayMessage instances
-        possibly_messages = [message for message in possibly_messages if _filter_fail(message)]
+        possibly_messages = []
+        for message in possibly_messages:
+            filter_fail_result = yield _filter_fail(message)
+            if filter_fail_result:
+                possibly_messages.append(message)
+
         if not possibly_messages:
             returnValue(0)
 
@@ -2256,6 +2287,7 @@ class Community(TaskManager):
                 if self.is_pending_task_active("download master member identity"):
                     self.cancel_pending_task("download master member identity")
 
+    @inlineCallbacks
     def create_signature_request(self, candidate, message, response_func, response_args=(), timeout=10.0, forward=True):
         """
         Create a dispersy-signature-request message.
@@ -2324,8 +2356,8 @@ class Community(TaskManager):
                                   payload=(cache.number, message))
 
         self._logger.debug("asking %s", [member.mid.encode("HEX") for member in members])
-        self._dispersy._forward([cache.request])
-        return cache
+        yield self._dispersy._forward([cache.request])
+        returnValue(cache)
 
     def check_signature_request(self, messages):
         assert isinstance(messages[0].meta.authentication, NoAuthentication)
@@ -2382,7 +2414,7 @@ class Community(TaskManager):
                                            payload=(message.payload.identifier, new_submsg)))
 
         if responses:
-            self.dispersy._forward(responses)
+            yield self.dispersy._forward(responses)
 
     def check_signature_response(self, messages):
         identifiers_seen = {}
@@ -2468,6 +2500,7 @@ class Community(TaskManager):
 
             yield message
 
+    @inlineCallbacks
     def on_introduction_request(self, messages, extra_payload=None):
         assert not extra_payload or isinstance(extra_payload, list), 'extra_payload is not a list %s' % type(extra_payload)
 
@@ -2534,9 +2567,9 @@ class Community(TaskManager):
                 responses.append(meta_introduction_response.impl(authentication=(self.my_member,), distribution=(self.global_time,), destination=(candidate,), payload=introduction_args_list))
 
         if responses:
-            self._dispersy._forward(responses)
+            yield self._dispersy._forward(responses)
         if requests:
-            self._dispersy._forward(requests)
+            yield self._dispersy._forward(requests)
 
         #
         # process the bloom filter part of the request
@@ -2563,7 +2596,8 @@ class Community(TaskManager):
                 messages_with_sync.append((message, time_low, time_high, offset, modulo))
 
         if messages_with_sync:
-            for message, generator in self._get_packets_for_bloomfilters(messages_with_sync, include_inactive=False):
+            bloomfilter_packets = yield self._get_packets_for_bloomfilters(messages_with_sync, include_inactive=False)
+            for message, generator in bloomfilter_packets:
                 payload = message.payload
                 # we limit the response by byte_limit bytes
                 byte_limit = self.dispersy_sync_response_limit
@@ -2579,7 +2613,7 @@ class Community(TaskManager):
                 if packets:
                     self._logger.debug("syncing %d packets (%d bytes) to %s",
                                        len(packets), sum(len(packet) for packet in packets), message.candidate)
-                    self._dispersy._send_packets([message.candidate], packets, self, "-caused by sync-")
+                    yield self._dispersy._send_packets([message.candidate], packets, self, "-caused by sync-")
 
     def check_introduction_response(self, messages):
         identifiers_seen = {}
@@ -2687,7 +2721,7 @@ class Community(TaskManager):
         else:
             # flush any sync-able items left in the cache before we create a sync
             yield self.flush_batch_cache()
-            sync = self.dispersy_claim_sync_bloom_filter(cache)
+            sync = yield self.dispersy_claim_sync_bloom_filter(cache)
             if __debug__:
                 assert sync is None or isinstance(sync, tuple), sync
                 if not sync is None:
@@ -2701,7 +2735,7 @@ class Community(TaskManager):
 
                     # verify that the bloom filter is correct
                     try:
-                        _, packets = self._get_packets_for_bloomfilters([[None, time_low, self.global_time if time_high == 0 else time_high, offset, modulo]], include_inactive=True).next()
+                        _, packets = yield self._get_packets_for_bloomfilters([[None, time_low, self.global_time if time_high == 0 else time_high, offset, modulo]], include_inactive=True).next()
                         packets = [packet for packet, in packets]
 
                     except OverflowError:
@@ -2750,10 +2784,11 @@ class Community(TaskManager):
                 self._logger.debug("%s %s sending introduction request to %s",
                                    self.cid.encode("HEX"), type(self), destination)
 
-            self._dispersy._forward([request])
+            yield self._dispersy._forward([request])
 
         returnValue(request)
 
+    @inlineCallbacks
     def _get_packets_for_bloomfilters(self, requests, include_inactive=True):
         """
         Return all packets matching a Bloomfilter request
@@ -2819,7 +2854,8 @@ class Community(TaskManager):
                 sql_arguments.extend((meta.database_id, _time_low, time_high, offset, modulo))
             self._logger.debug("%s", sql_arguments)
 
-            yield message, ((str(packet),) for packet, in self._dispersy.database.stormdb.fetchall(sql, sql_arguments))
+            sync_packets = yield self._dispersy.database.stormdb.fetchall(sql, sql_arguments)
+            yield message, ((str(packet),) for packet, in sync_packets)
 
     def check_puncture_request(self, messages):
         for message in messages:
@@ -2849,6 +2885,7 @@ class Community(TaskManager):
 
             yield message
 
+    @inlineCallbacks
     def on_puncture_request(self, messages):
         meta_puncture = self.get_meta_message(u"dispersy-puncture")
         punctures = []
@@ -2870,7 +2907,7 @@ class Community(TaskManager):
             punctures.append(meta_puncture.impl(authentication=(self.my_member,), distribution=(self.global_time,), destination=(candidate,), payload=(self._dispersy._lan_address, self._dispersy._wan_address, message.payload.identifier)))
             self._logger.debug("%s asked us to send a puncture to %s", message.candidate, candidate)
 
-        self._dispersy._forward(punctures)
+        yield self._dispersy._forward(punctures)
 
     def check_puncture(self, messages):
         identifiers_seen = {}
@@ -2901,11 +2938,13 @@ class Community(TaskManager):
                 self._logger.debug("received punture from %s", candidate)
                 cache.puncture_candidate = candidate
 
+    @inlineCallbacks
     def create_missing_message(self, candidate, member, global_time):
         meta = self.get_meta_message(u"dispersy-missing-message")
         request = meta.impl(distribution=(self.global_time,), destination=(candidate,), payload=(member, [global_time]))
-        self._dispersy._forward([request])
+        yield self._dispersy._forward([request])
 
+    @inlineCallbacks
     def on_missing_message(self, messages):
         for message in messages:
 
@@ -2921,7 +2960,7 @@ class Community(TaskManager):
                     pass
 
             if responses:
-                self._dispersy._send_packets([candidate], responses, self, "-caused by missing-message-")
+                yield self._dispersy._send_packets([candidate], responses, self, "-caused by missing-message-")
             else:
                 self._logger.warning('could not find missing messages for candidate %s, global_times %s',
                                      candidate, message.payload.global_times)
@@ -2965,6 +3004,7 @@ class Community(TaskManager):
             self.my_member.add_identity(self)
         returnValue(message)
 
+    @inlineCallbacks
     def create_missing_identity(self, candidate, dummy_member):
         """
         Create a dispersy-missing-identity message.
@@ -2979,8 +3019,9 @@ class Community(TaskManager):
 
         meta = self.get_meta_message(u"dispersy-missing-identity")
         request = meta.impl(distribution=(self.global_time,), destination=(candidate,), payload=(dummy_member.mid,))
-        self._dispersy._forward([request])
+        yield self._dispersy._forward([request])
 
+    @inlineCallbacks
     def on_missing_identity(self, messages):
         """
         We received dispersy-missing-identity messages.
@@ -3001,13 +3042,15 @@ class Community(TaskManager):
             mid = message.payload.mid
 
             # we are assuming that no more than 10 members have the same sha1 digest.
-            for member_id in [member_id for member_id, in self._dispersy.database.stormdb.fetchall(sql_member, (buffer(mid),))]:
-                packets = [str(packet) for packet, in self._dispersy.database.stormdb.fetchall(sql_packet,
-                                                                                       (self.database_id, member_id, meta_id))]
+            sql_members = yield self._dispersy.database.stormdb.fetchall(sql_member, (buffer(mid),))
+            for member_id in [member_id for member_id, in sql_members]:
+                sql_packets = yield self._dispersy.database.stormdb.fetchall(sql_packet,
+                                                                                       (self.database_id, member_id, meta_id))
+                packets = [str(packet) for packet, in sql_packets]
 
                 if packets:
                     self._logger.debug("responding with %d identity messages", len(packets))
-                    self._dispersy._send_packets([message.candidate], packets, self, "-caused by missing-identity-")
+                    yield self._dispersy._send_packets([message.candidate], packets, self, "-caused by missing-identity-")
 
                 else:
                     assert not message.payload.mid == self.my_member.mid, "we should always have our own dispersy-identity"
@@ -3015,11 +3058,13 @@ class Community(TaskManager):
                                          " no response is sent [%s, mid:%s, cid:%s]",
                                          mid.encode("HEX"), self.my_member.mid.encode("HEX"), self.cid.encode("HEX"))
 
+    @inlineCallbacks
     def create_missing_sequence(self, candidate, member, message, missing_low, missing_high):
         meta = self.get_meta_message(u"dispersy-missing-sequence")
         request = meta.impl(distribution=(self.global_time,), destination=(candidate,), payload=(member, message, missing_low, missing_high))
-        self._dispersy._forward([request])
+        yield self._dispersy._forward([request])
 
+    @inlineCallbacks
     def on_missing_sequence(self, messages):
         """
         We received a dispersy-missing-sequence message.
@@ -3058,6 +3103,8 @@ class Community(TaskManager):
                     cur_low, cur_high = low, high
             yield (cur_low, cur_high)
 
+        @inlineCallbacks
+        # TOTO(Laurens): member_id and message_id are not used.
         def fetch_packets(member_id, message_id, candidate, requests):
             # We limit the response by byte_limit bytes per incoming candidate
             byte_limit = self.dispersy_missing_sequence_response_limit
@@ -3071,19 +3118,20 @@ class Community(TaskManager):
                 self._logger.debug("fetching member:%d message:%d packets from database for %s",
                                    member_id, message_id, candidate)
                 for range_min, range_max in merge_ranges(sequences):
-                    for packet, in self._dispersy.database.stormdb.fetchall(
+                    sync_packets = yield self._dispersy.database.stormdb.fetchall(
                             u"SELECT packet FROM sync "
                             u"WHERE member = ? AND meta_message = ? AND sequence BETWEEN ? AND ? "
                             u"ORDER BY sequence",
-                            (member_id, message_id, range_min, range_max)):
+                            (member_id, message_id, range_min, range_max))
+                    for packet, in sync_packets:
                         packet = str(packet)
                         packets.append(packet)
 
                         byte_limit -= len(packet)
                         if byte_limit <= 0:
                             self._logger.debug("Bandwidth throttle.  byte_limit:%d", byte_limit)
-                            return packets
-            return packets
+                            returnValue(packets)
+            returnValue(packets)
 
         sources = defaultdict(lambda: defaultdict(list))
         for message in messages:
@@ -3097,11 +3145,11 @@ class Community(TaskManager):
 
         for candidate, member_message_requests in sources.iteritems():
             assert isinstance(candidate, Candidate), type(candidate)
-            packets = fetch_packets(member_id, message_id, candidate, member_message_requests)
+            packets = yield fetch_packets(member_id, message_id, candidate, member_message_requests)
             if __debug__:
                 # ensure we are sending the correct sequence numbers back
                 for packet in packets:
-                    msg = self._dispersy.convert_packet_to_message(packet, self)
+                    msg = yield self._dispersy.convert_packet_to_message(packet, self)
                     assert msg
                     self._logger.debug("syncing %d bytes, member:%d message:%d sequence:%d to %s",
                                  len(packet),
@@ -3110,13 +3158,15 @@ class Community(TaskManager):
                                  msg.distribution.sequence_number,
                                  candidate)
 
-            self._dispersy._send_packets([candidate], packets, self, u"-sequence-")
+            yield self._dispersy._send_packets([candidate], packets, self, u"-sequence-")
 
+    @inlineCallbacks
     def create_missing_proof(self, candidate, message):
         meta = self.get_meta_message(u"dispersy-missing-proof")
         request = meta.impl(distribution=(self.global_time,), destination=(candidate,), payload=(message.authentication.member, message.distribution.global_time))
-        self._dispersy._forward([request])
+        yield self._dispersy._forward([request])
 
+    @inlineCallbacks
     def on_missing_proof(self, messages):
         for message in messages:
             try:
@@ -3128,11 +3178,11 @@ class Community(TaskManager):
 
             else:
                 packet = str(packet)
-                msg = self._dispersy.convert_packet_to_message(packet, self, verify=False)
+                msg = yield self._dispersy.convert_packet_to_message(packet, self, verify=False)
                 allowed, proofs = self.timeline.check(msg)
                 if allowed and proofs:
                     self._logger.debug("we found %d packets containing proof for %s", len(proofs), message.candidate)
-                    self._dispersy._send_packets([message.candidate], [proof.packet for proof in proofs], self, "-caused by missing-proof-")
+                    yield self._dispersy._send_packets([message.candidate], [proof.packet for proof in proofs], self, "-caused by missing-proof-")
 
                 else:
                     self._logger.debug("unable to give %s missing proof.  allowed:%s.  proofs:%d packets",
@@ -3274,6 +3324,7 @@ class Community(TaskManager):
         yield self._dispersy.store_update_forward([message], store, update, forward)
         returnValue(message)
 
+    @inlineCallbacks
     def on_revoke(self, messages, initializing=False):
         """
         Process a dispersy-revoke message.
@@ -3299,7 +3350,7 @@ class Community(TaskManager):
 
         if not initializing:
             for meta, globaltime_range in changes.iteritems():
-                self._update_timerange(meta, globaltime_range[0], globaltime_range[1])
+                yield self._update_timerange(meta, globaltime_range[0], globaltime_range[1])
 
     @inlineCallbacks
     def create_undo(self, message, sign_with_master=False, store=True, update=True, forward=True):
@@ -3342,11 +3393,16 @@ class Community(TaskManager):
                                    "trying to return the previous undo message")
                 undo_own_meta = self.get_meta_message(u"dispersy-undo-own")
                 undo_other_meta = self.get_meta_message(u"dispersy-undo-other")
-                for packet_id, message_id, packet in self._dispersy.database.stormdb.fetchall(
+                sync_packets = yield self._dispersy.database.stormdb.fetchall(
                         u"SELECT id, meta_message, packet FROM sync WHERE community = ? AND member = ? AND meta_message IN (?, ?)",
-                        (self.database_id, message.authentication.member.database_id, undo_own_meta.database_id, undo_other_meta.database_id)):
+                        (self.database_id, message.authentication.member.database_id, undo_own_meta.database_id, undo_other_meta.database_id))
+                for packet_id, message_id, packet in sync_packets:
                     self._logger.debug("checking: %s", message_id)
-                    msg = Packet(undo_own_meta if undo_own_meta.database_id == message_id else undo_other_meta, str(packet), packet_id).load_message()
+                    if undo_own_meta.database_id == message_id:
+                        p = Packet(undo_own_meta)
+                    else:
+                        p = Packet(undo_other_meta, str(packet), packet_id)
+                    msg = yield p.load_message()
                     if message.distribution.global_time == msg.payload.global_time:
                         returnValue(msg)
 
@@ -3371,6 +3427,7 @@ class Community(TaskManager):
                 yield self._dispersy.store_update_forward([msg], store, update, forward)
                 returnValue(msg)
 
+    @inlineCallbacks
     def check_undo(self, messages):
         # Note: previously all MESSAGES have been checked to ensure that the sequence numbers are
         # correct.  this check takes into account the messages in the batch.  hence, if one of these
@@ -3431,11 +3488,12 @@ class Community(TaskManager):
                 # look for other packets we received that undid this packet
                 member = message.authentication.member
                 undo_own_meta = self.get_meta_message(u"dispersy-undo-own")
-                for packet_id, packet in self._dispersy.database.stormdb.fetchall(
+                sync_packets = yield self._dispersy.database.stormdb.fetchall(
                         u"SELECT id, packet FROM sync WHERE community = ? AND member = ? AND meta_message = ?",
-                        (self.database_id, member.database_id, undo_own_meta.database_id)):
-
-                    db_msg = Packet(undo_own_meta, str(packet), packet_id).load_message()
+                        (self.database_id, member.database_id, undo_own_meta.database_id))
+                for packet_id, packet in sync_packets:
+                    p = Packet(undo_own_meta, str(packet), packet_id)
+                    db_msg = yield p.load_message()
                     if message.payload.global_time == db_msg.payload.global_time:
                         # we've found another packet which undid this packet
                         if member == self.my_member:
@@ -3448,7 +3506,7 @@ class Community(TaskManager):
                             message.payload.process_undo = False
                             yield message
                             # the sender apparently does not have the lower dispersy-undo message, lets give it back
-                            self._dispersy._send_packets([message.candidate], [db_msg.packet], self, db_msg.name)
+                            yield self._dispersy._send_packets([message.candidate], [db_msg.packet], self, db_msg.name)
 
                             yield DispersyDuplicatedUndo(db_msg, message)
                             break
@@ -3510,16 +3568,17 @@ class Community(TaskManager):
         # in this special case we need to forward the message before processing it locally.
         # otherwise the candidate table will have been cleaned and we won't have any destination
         # addresses.
-        self._dispersy._forward([message])
+        yield self._dispersy._forward([message])
 
         # now store and update without forwarding.  forwarding now will result in new entries in our
         # candidate table that we just clean.
         yield self._dispersy.store_update_forward([message], store, update, False)
         returnValue(message)
 
+    @inlineCallbacks
     def on_destroy_community(self, messages):
         # epidemic spread of the destroy message
-        self._dispersy._forward(messages)
+        yield self._dispersy._forward(messages)
 
         for message in messages:
             assert message.name == u"dispersy-destroy-community"
@@ -3593,7 +3652,7 @@ class Community(TaskManager):
                 # community is no longer available
                 self._dispersy.database.stormdb.execute(u"DELETE FROM sync WHERE community = ? AND id NOT IN (" + u", ".join(u"?" for _ in packet_ids) + ")", [self.database_id] + list(packet_ids))
 
-            self._dispersy.reclassify_community(self, new_classification)
+            yield self._dispersy.reclassify_community(self, new_classification)
 
     @inlineCallbacks
     def create_dynamic_settings(self, policies, sign_with_master=False, store=True, update=True, forward=True):
@@ -3604,6 +3663,7 @@ class Community(TaskManager):
         yield self._dispersy.store_update_forward([message], store, update, forward)
         returnValue(message)
 
+    @inlineCallbacks
     def on_dynamic_settings(self, messages, initializing=False):
         assert isinstance(initializing, bool)
 
@@ -3618,8 +3678,9 @@ class Community(TaskManager):
 
         if not initializing:
             for meta, globaltime_range in changes.iteritems():
-                self._update_timerange(meta, globaltime_range[0], globaltime_range[1])
+                yield self._update_timerange(meta, globaltime_range[0], globaltime_range[1])
 
+    @inlineCallbacks
     def _update_timerange(self, meta, time_low, time_high):
         executemany = self._dispersy.database.stormdb.executemany
         fetchall = self._dispersy.database.stormdb.fetchall
@@ -3628,9 +3689,10 @@ class Community(TaskManager):
         undo = []
         redo = []
 
-        for packet_id, packet, undone in fetchall(u"SELECT id, packet, undone FROM sync WHERE meta_message = ? AND global_time BETWEEN ? AND ?",
-                                                      (meta.database_id, time_low, time_high)):
-            message = self._dispersy.convert_packet_to_message(str(packet), self)
+        sync_packets = yield fetchall(u"SELECT id, packet, undone FROM sync WHERE meta_message = ? AND global_time BETWEEN ? AND ?",
+                                                      (meta.database_id, time_low, time_high))
+        for packet_id, packet, undone in sync_packets:
+            message = yield self._dispersy.convert_packet_to_message(str(packet), self)
             if message:
                 message.packet_id = packet_id
                 allowed, _ = self.timeline.check(message)
@@ -3680,8 +3742,9 @@ class Community(TaskManager):
 
 class HardKilledCommunity(Community):
 
+    @inlineCallbacks
     def initialize(self, *args, **kargs):
-        super(HardKilledCommunity, self).initialize(*args, **kargs)
+        yield super(HardKilledCommunity, self).initialize(*args, **kargs)
         destroy_message_id = self._meta_messages[u"dispersy-destroy-community"].database_id
         try:
             packet, = self._dispersy.database.stormdb.fetchone(u"SELECT packet FROM sync WHERE meta_message = ? LIMIT 1", (destroy_message_id,))
@@ -3718,7 +3781,8 @@ class HardKilledCommunity(Community):
             # try again
             return super(HardKilledCommunity, self).get_conversion_for_packet(packet)
 
+    @inlineCallbacks
     def on_introduction_request(self, messages):
         if self._destroy_community_packet:
-            self._dispersy._send_packets([message.candidate for message in messages], [self._destroy_community_packet],
+            yield self._dispersy._send_packets([message.candidate for message in messages], [self._destroy_community_packet],
                 self, "-caused by destroy-community-")

@@ -1,3 +1,5 @@
+from twisted.internet.defer import inlineCallbacks
+
 from ...authentication import DoubleMemberAuthentication, MemberAuthentication
 from ...candidate import Candidate
 from ...community import Community, HardKilledCommunity
@@ -42,7 +44,7 @@ class DebugCommunity(Community):
                     LastSyncDistribution(synchronization_direction=u"ASC", priority=128, history_size=1),
                     CommunityDestination(node_count=10),
                     TextPayload(),
-                    self._generic_timeline_check,
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                     self.on_text),
             Message(self, u"last-9-test",
                     MemberAuthentication(),
@@ -50,7 +52,7 @@ class DebugCommunity(Community):
                     LastSyncDistribution(synchronization_direction=u"ASC", priority=128, history_size=9),
                     CommunityDestination(node_count=10),
                     TextPayload(),
-                    self._generic_timeline_check,
+                    self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                     self.on_text),
                 Message(self, u"last-1-doublemember-text",
                         DoubleMemberAuthentication(allow_signature_func=self.allow_double_signed_text),
@@ -58,7 +60,7 @@ class DebugCommunity(Community):
                         LastSyncDistribution(synchronization_direction=u"ASC", priority=128, history_size=1),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"double-signed-text",
                         DoubleMemberAuthentication(allow_signature_func=self.allow_double_signed_text),
@@ -66,7 +68,7 @@ class DebugCommunity(Community):
                         DirectDistribution(),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"double-signed-text-split",
                         DoubleMemberAuthentication(allow_signature_func=self.allow_double_signed_text, split_payload_func=self.split_double_payload),
@@ -74,7 +76,7 @@ class DebugCommunity(Community):
                         DirectDistribution(),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"full-sync-text",
                         MemberAuthentication(),
@@ -82,32 +84,32 @@ class DebugCommunity(Community):
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text,
-                        self.undo_text),
+                        self.undo_text), # TODO(Laurens): this method returns a deferred, is that ok?
                 Message(self, u"bin-key-text",
                         MemberAuthentication(encoding="bin"),
                         PublicResolution(),
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text,
-                        self.undo_text),
+                        self.undo_text), # TODO(Laurens): this method returns a deferred, is that ok?
                 Message(self, u"ASC-text",
                         MemberAuthentication(),
                         PublicResolution(),
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"DESC-text", MemberAuthentication(),
                         PublicResolution(),
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"DESC", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"protected-full-sync-text",
                         MemberAuthentication(),
@@ -115,9 +117,9 @@ class DebugCommunity(Community):
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text,
-                        self.undo_text),
+                        self.undo_text), # TODO(Laurens): this method returns a deferred, is that ok?
                 Message(self, u"dynamic-resolution-text",
                         MemberAuthentication(),
                         DynamicResolution(PublicResolution(),
@@ -125,34 +127,34 @@ class DebugCommunity(Community):
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text,
-                        self.undo_text),
+                        self.undo_text), # TODO(Laurens): this method returns a deferred, is that ok?
                 Message(self, u"sequence-text",
                         MemberAuthentication(),
                         PublicResolution(),
                         FullSyncDistribution(enable_sequence_number=True, synchronization_direction=u"ASC", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text,
-                        self.undo_text),
+                        self.undo_text), # TODO(Laurens): this method returns a deferred, is that ok?
                 Message(self, u"full-sync-global-time-pruning-text",
                         MemberAuthentication(),
                         PublicResolution(),
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=128, pruning=GlobalTimePruning(10, 20)),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text,
-                        self.undo_text),
+                        self.undo_text), # TODO(Laurens): this method returns a deferred, is that ok?
                 Message(self, u"high-priority-text",
                         MemberAuthentication(),
                         PublicResolution(),
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=200),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"low-priority-text",
                         MemberAuthentication(),
@@ -160,7 +162,7 @@ class DebugCommunity(Community):
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=100),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"medium-priority-text",
                         MemberAuthentication(),
@@ -168,7 +170,7 @@ class DebugCommunity(Community):
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=150),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"RANDOM-text",
                         MemberAuthentication(),
@@ -176,7 +178,7 @@ class DebugCommunity(Community):
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"RANDOM", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text),
                 Message(self, u"batched-text",
                         MemberAuthentication(),
@@ -184,7 +186,7 @@ class DebugCommunity(Community):
                         FullSyncDistribution(enable_sequence_number=False, synchronization_direction=u"ASC", priority=128),
                         CommunityDestination(node_count=10),
                         TextPayload(),
-                        self._generic_timeline_check,
+                        self._generic_timeline_check, #TODO(Laurens): this now returns a deferred, is that ok?
                         self.on_text,
                         batch=BatchConfiguration(max_window=5.0)),
                 ])
@@ -232,12 +234,13 @@ class DebugCommunity(Community):
             if not "Dprint=False" in message.payload.text:
                 self._logger.debug("%s \"%s\" @%d", message, message.payload.text, message.distribution.global_time)
 
+    @inlineCallbacks
     def undo_text(self, descriptors):
         """
         Received an undo for a text message.
         """
         for member, global_time, packet in descriptors:
-            message = packet.load_message()
+            message = yield packet.load_message()
             self._logger.debug("undo \"%s\" @%d", message.payload.text, global_time)
 
     def dispersy_cleanup_community(self, message):

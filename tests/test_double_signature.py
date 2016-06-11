@@ -14,7 +14,7 @@ class TestDoubleSign(DispersyTestFunc):
         """
         container = {"timeout": 0}
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         def on_response(request, response, modified):
             self.assertIsNone(response)
@@ -37,7 +37,7 @@ class TestDoubleSign(DispersyTestFunc):
         container = {"response": 0}
 
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         def on_response(request, response, modified):
             self.assertNotEqual(response, None)
@@ -70,8 +70,8 @@ class TestDoubleSign(DispersyTestFunc):
         self.assertEqual(submsg.packet[second_signature_offset:], "\x00" * other.my_member.signature_length, "The second signature MUST BE 0x00's.")
 
         # reply sent by OTHER is ok, give it to NODE to process it
-        other.give_message(message, node)
-        node.process_packets()
+        yield other.give_message(message, node)
+        yield node.process_packets()
 
         sleep(1.5)
 
@@ -86,7 +86,7 @@ class TestDoubleSign(DispersyTestFunc):
         container = {"response": 0}
 
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         def on_response(request, response, modified):
             self.assertNotEqual(response, None)
@@ -122,8 +122,8 @@ class TestDoubleSign(DispersyTestFunc):
         self.assertEqual(submsg.packet[second_signature_offset:], "\x00" * other.my_member.signature_length, "The second signature MUST BE 0x00's.")
 
         # reply sent by OTHER is ok, give it to NODE to process it
-        other.give_message(message, node)
-        node.process_packets()
+        yield other.give_message(message, node)
+        yield node.process_packets()
 
         sleep(1.5)
 
@@ -138,7 +138,7 @@ class TestDoubleSign(DispersyTestFunc):
         container = {"response": 0}
 
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         def on_response(request, response, modified):
             self.assertNotEqual(response, None)
@@ -173,8 +173,8 @@ class TestDoubleSign(DispersyTestFunc):
         self.assertEqual(submsg.packet[second_signature_offset:], "\x00" * other.my_member.signature_length, "The second signature MUST BE 0x00's.")
 
         # reply sent by OTHER is ok, give it to NODE to process it
-        other.give_message(message, node)
-        node.process_packets()
+        yield other.give_message(message, node)
+        yield node.process_packets()
 
         sleep(1.5)
 

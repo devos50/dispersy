@@ -30,7 +30,6 @@ class DebugNode(object):
        node.init_my_member()
     """
 
-
     def __init__(self, testclass, dispersy):
         super(DebugNode, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
@@ -50,10 +49,10 @@ class DebugNode(object):
         self._my_member = yield self._dispersy.get_new_member(curve)
         self._my_pub_member = Member(self._dispersy, self._my_member._ec.pub(), self._my_member.database_id)
         if c_master_member == None:
-            self._community = communityclass.create_community(self._dispersy, self._my_member)
+            self._community = yield communityclass.create_community(self._dispersy, self._my_member)
         else:
             mm = self._dispersy.get_member(mid=c_master_member._community._master_member.mid)
-            self._community = communityclass.init_community(self._dispersy, mm, self._my_member)
+            self._community = yield communityclass.init_community(self._dispersy, mm, self._my_member)
 
         self._central_node = c_master_member
 
@@ -127,15 +126,15 @@ class DebugNode(object):
         """
         self._tunnel = tunnel
         if self._central_node:
-            self.send_identity(self._central_node)
+            yield self.send_identity(self._central_node)
 
             # download mm identity, mm authorizing central_node._my_member
-            packets = self._central_node.fetch_packets([u"dispersy-identity", u"dispersy-authorize"], self._community.master_member.mid)
-            self.give_packets(packets, self._central_node)
+            packets = yield self._central_node.fetch_packets([u"dispersy-identity", u"dispersy-authorize"], self._community.master_member.mid)
+            yield self.give_packets(packets, self._central_node)
 
             # add this node to candidate list of mm
             message = self.create_introduction_request(self._central_node.my_candidate, self.lan_address, self.wan_address, False, u"unknown", None, 1, 1)
-            self._central_node.give_message(message, self)
+            yield self._central_node.give_message(message, self)
 
             # remove introduction responses from socket
             messages = yield self.receive_messages(names=[u'dispersy-introduction-response'])
@@ -149,9 +148,11 @@ class DebugNode(object):
         assert isinstance(message, Message.Implementation)
         return self._community.get_conversion_for_message(message).encode_message(message)
 
+    @inlineCallbacks
     def give_packet(self, packet, source, cache=False):
-        self.give_packets([packet], source, cache=cache)
+        yield self.give_packets([packet], source, cache=cache)
 
+    @inlineCallbacks
     def give_packets(self, packets, source, cache=False):
         """
         Give multiple PACKETS directly to Dispersy on_incoming_packets.
@@ -163,11 +164,13 @@ class DebugNode(object):
         assert isinstance(cache, bool), type(cache)
 
         self._logger.debug("%s giving %d bytes", self.my_candidate, sum(len(packet) for packet in packets))
-        self._dispersy.endpoint.process_packets([(source.lan_address, TUNNEL_PREFIX + packet if source.tunnel else packet) for packet in packets], cache=cache)
+        yield self._dispersy.endpoint.process_packets([(source.lan_address, TUNNEL_PREFIX + packet if source.tunnel else packet) for packet in packets], cache=cache)
 
+    @inlineCallbacks
     def give_message(self, message, source, cache=False):
-        self.give_messages([message], source, cache=cache)
+        yield self.give_messages([message], source, cache=cache)
 
+    @inlineCallbacks
     def give_messages(self, messages, source, cache=False):
         """
         Give multiple MESSAGES directly to Dispersy on_incoming_packets after they are encoded.
@@ -180,8 +183,9 @@ class DebugNode(object):
         packets = [message.packet if message.packet else self.encode_message(message) for message in messages]
         self._logger.debug("%s giving %d messages (%d bytes)",
                            self.my_candidate, len(messages), sum(len(packet) for packet in packets))
-        self.give_packets(packets, source, cache=cache)
+        yield self.give_packets(packets, source, cache=cache)
 
+    @inlineCallbacks
     def send_packet(self, packet, candidate):
         """
         Sends PACKET to ADDRESS using the nodes' socket.
@@ -190,8 +194,10 @@ class DebugNode(object):
         assert isinstance(packet, str)
         assert isinstance(candidate, Candidate)
         self._logger.debug("%d bytes to %s", len(packet), candidate)
-        return self._dispersy.endpoint.send([candidate], [packet])
+        send_result = yield self._dispersy.endpoint.send([candidate], [packet])
+        returnValue(send_result)
 
+    @inlineCallbacks
     def send_message(self, message, candidate):
         """
         Sends MESSAGE to ADDRESS using the nodes' socket after it is encoded.
@@ -203,17 +209,19 @@ class DebugNode(object):
         self._logger.debug("%s to %s", message.name, candidate)
         self.encode_message(message)
 
-        return self.send_packet(message.packet, candidate)
+        res = yield self.send_packet(message.packet, candidate)
+        returnValue(res)
 
+    @inlineCallbacks
     def process_packets(self, timeout=1.0):
         """
         Process all packets on the nodes' socket.
         """
         timeout = time() + timeout
         while timeout > time():
-            packets = self._dispersy.endpoint.process_receive_queue()
+            packets = yield self._dispersy.endpoint.process_receive_queue()
             if packets:
-                return packets
+                returnValue(packets)
             else:
                 sleep(0.1)
 
@@ -310,21 +318,26 @@ class DebugNode(object):
         return self._community.get_conversion_for_packet(packet).decode_message(candidate, packet)
 
     @blocking_call_on_reactor_thread
+    @inlineCallbacks
     def fetch_packets(self, message_names, mid=None):
         if mid:
-            return [str(packet) for packet, in self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync, member WHERE sync.member = member.id "
+            packets = yield self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync, member WHERE sync.member = member.id "
                                                                                     u"AND mid = ? AND meta_message IN (" + ", ".join("?" * len(message_names)) + ") ORDER BY global_time, packet",
-                                                                                [buffer(mid), ] + [self._community.get_meta_message(name).database_id for name in message_names])]
-        return [str(packet) for packet, in self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync WHERE meta_message IN (" + ", ".join("?" * len(message_names)) + ") ORDER BY global_time, packet",
-                                                                                [self._community.get_meta_message(name).database_id for name in message_names])]
+                                                                                [buffer(mid), ] + [self._community.get_meta_message(name).database_id for name in message_names])
+            returnValue([str(packet) for packet, in packets])
+        packets = yield self._dispersy.database.stormdb.fetchall(u"SELECT packet FROM sync WHERE meta_message IN (" + ", ".join("?" * len(message_names)) + ") ORDER BY global_time, packet",
+                                                                                [self._community.get_meta_message(name).database_id for name in message_names])
+        returnValue([str(packet) for packet, in packets])
 
     @blocking_call_on_reactor_thread
+    @inlineCallbacks
     def fetch_messages(self, message_names, mid=None):
         """
         Fetch all packets for MESSAGE_NAMES from the database and converts them into
         Message.Implementation instances.
         """
-        return self._dispersy.convert_packets_to_messages(self.fetch_packets(message_names, mid), community=self._community, verify=False)
+        res = yield self._dispersy.convert_packets_to_messages(self.fetch_packets(message_names, mid), community=self._community, verify=False)
+        returnValue(res)
 
     @blocking_call_on_reactor_thread
     def count_messages(self, message):
@@ -385,12 +398,13 @@ class DebugNode(object):
     def assert_count(self, message, count):
         self._testclass.assertEqual(self.count_messages(message), count)
 
+    @inlineCallbacks
     def send_identity(self, other):
-        packets = self.fetch_packets([u"dispersy-identity", ], self.my_member.mid)
-        other.give_packets(packets, self)
+        packets = yield self.fetch_packets([u"dispersy-identity", ], self.my_member.mid)
+        yield other.give_packets(packets, self)
 
-        packets = other.fetch_packets([u"dispersy-identity", ], other.my_member.mid)
-        self.give_packets(packets, other)
+        packets = yield other.fetch_packets([u"dispersy-identity", ], other.my_member.mid)
+        yield self.give_packets(packets, other)
 
     @blocking_call_on_reactor_thread
     @inlineCallbacks

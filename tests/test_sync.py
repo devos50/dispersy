@@ -7,7 +7,7 @@ class TestSync(DispersyTestFunc):
     @inlineCallbacks
     def _create_nodes_messages(self, messagetype="create_full_sync_text"):
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         # other creates messages
         messages = [getattr(other, messagetype)("Message %d" % i, i + 10) for i in xrange(30)]
@@ -29,7 +29,7 @@ class TestSync(DispersyTestFunc):
                 global_times = [message.distribution.global_time for message in messages if (message.distribution.global_time + offset) % modulo == 0]
 
                 sync = (1, 0, modulo, offset, [])
-                other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42), node)
+                yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42), node)
 
                 responses = node.receive_messages(names=[u"full-sync-text"], return_after=len(global_times))
                 response_times = [message.distribution.global_time for _, message in responses]
@@ -46,7 +46,7 @@ class TestSync(DispersyTestFunc):
                 global_times = [message.distribution.global_time for message in messages if time_low <= message.distribution.global_time <= time_high]
 
                 sync = (time_low, time_high, 1, 0, [])
-                other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42), node)
+                yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42), node)
 
                 responses = node.receive_messages(names=[u"full-sync-text"], return_after=len(global_times))
                 response_times = [message.distribution.global_time for _, message in responses]
@@ -59,7 +59,7 @@ class TestSync(DispersyTestFunc):
         global_times = [message.distribution.global_time for message in messages]
 
         # send an empty sync message to obtain all messages ASC order
-        other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
+        yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
 
         responses = node.receive_messages(names=[u"ASC-text"], return_after=len(global_times))
         response_times = [message.distribution.global_time for _, message in responses]
@@ -72,7 +72,7 @@ class TestSync(DispersyTestFunc):
         global_times = [message.distribution.global_time for message in messages]
 
         # send an empty sync message to obtain all messages DESC order
-        other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
+        yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
 
         responses = node.receive_messages(names=[u"DESC-text"], return_after=len(global_times))
         response_times = [message.distribution.global_time for _, message in responses]
@@ -85,7 +85,7 @@ class TestSync(DispersyTestFunc):
         global_times = [message.distribution.global_time for message in messages]
 
         # send an empty sync message to obtain all messages in RANDOM order
-        other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
+        yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
 
         responses = node.receive_messages(names=[u"RANDOM-text"], return_after=len(global_times))
         response_times = [message.distribution.global_time for _, message in responses]
@@ -96,7 +96,7 @@ class TestSync(DispersyTestFunc):
     @inlineCallbacks
     def test_mixed_order(self):
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         # OTHER creates messages
         in_order_messages = [other.create_in_order_text("Message %d" % i, i + 10) for i in xrange(0, 30, 3)]
@@ -108,7 +108,7 @@ class TestSync(DispersyTestFunc):
         yield other.store(random_order_messages)
 
         # send an empty sync message to obtain all messages ALL messages
-        other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (1, 0, 1, 0, []), 42), node)
+        yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (1, 0, 1, 0, []), 42), node)
 
         received = node.receive_messages(names=[u"ASC-text", u"DESC-text", u"RANDOM-text"], return_after=30)
 
@@ -128,7 +128,7 @@ class TestSync(DispersyTestFunc):
     @inlineCallbacks
     def test_priority_order(self):
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         # OTHER creates messages
         high_priority_messages = [other.create_high_priority_text("Message %d" % i, i + 10) for i in xrange(0, 30, 3)]
@@ -140,7 +140,7 @@ class TestSync(DispersyTestFunc):
         yield other.store(medium_priority_messages)
 
         # send an empty sync message to obtain all messages ALL messages
-        other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (1, 0, 1, 0, []), 42), node)
+        yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (1, 0, 1, 0, []), 42), node)
 
         received = node.receive_messages(names=[u"high-priority-text", u"low-priority-text", u"medium-priority-text"], return_after=30)
 
@@ -159,24 +159,25 @@ class TestSync(DispersyTestFunc):
         self.assertEqual([message.name for _, message in received[offset:offset + len(low_priority_messages)]],
                          ["low-priority-text"] * len(low_priority_messages))
 
+    @inlineCallbacks
     def test_last_1(self):
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         # send a message
         message = other.create_last_1_test("should be accepted (1)", 10)
-        node.give_message(message, other)
+        yield node.give_message(message, other)
         node.assert_is_stored(message)
 
         # send a message, should replace current one
         new_message = other.create_last_1_test("should be accepted (2)", 11)
-        node.give_message(new_message, other)
+        yield node.give_message(new_message, other)
         node.assert_not_stored(message)
         node.assert_is_stored(new_message)
 
         # send a message (older: should be dropped)
         old_message = other.create_last_1_test("should be dropped (1)", 9)
-        node.give_message(old_message, other)
+        yield node.give_message(old_message, other)
 
         node.assert_not_stored(message)
         node.assert_is_stored(new_message)
@@ -186,18 +187,19 @@ class TestSync(DispersyTestFunc):
         _, message = other.receive_message(names=[u"last-1-test"]).next()
         self.assertEqual(message.distribution.global_time, new_message.distribution.global_time)
 
+    @inlineCallbacks
     def test_last_9(self):
         self._community.get_meta_message(u"last-9-test")
 
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         all_messages = [21, 20, 28, 27, 22, 23, 24, 26, 25]
         messages_so_far = []
         for global_time in all_messages:
             # send a message
             message = other.create_last_9_test(str(global_time), global_time)
-            node.give_message(message, other)
+            yield node.give_message(message, other)
 
             messages_so_far.append((global_time, message))
 
@@ -206,7 +208,7 @@ class TestSync(DispersyTestFunc):
 
         for global_time in [11, 12, 13, 19, 18, 17]:
             # send a message (older: should be dropped)
-            node.give_message(other.create_last_9_test(str(global_time), global_time), other)
+            yield node.give_message(other.create_last_9_test(str(global_time), global_time), other)
 
         for _, message in messages_so_far:
             node.assert_is_stored(message)
@@ -215,7 +217,7 @@ class TestSync(DispersyTestFunc):
         for global_time in [30, 35, 37, 31, 32, 34, 33, 36, 38, 45, 44, 43, 42, 41, 40, 39]:
             # send a message (should be added and old one removed)
             message = other.create_last_9_test(str(global_time), global_time)
-            node.give_message(message, other)
+            yield node.give_message(message, other)
 
             messages_so_far.pop(0)
             messages_so_far.append((global_time, message))
@@ -245,10 +247,11 @@ class TestSync(DispersyTestFunc):
         """
         message = self._community.get_meta_message(u"last-1-doublemember-text")
         nodeA, nodeB, nodeC = self.create_nodes(3)
-        nodeA.send_identity(nodeB)
-        nodeA.send_identity(nodeC)
-        nodeB.send_identity(nodeC)
+        yield nodeA.send_identity(nodeB)
+        yield nodeA.send_identity(nodeC)
+        yield nodeB.send_identity(nodeC)
 
+        @inlineCallbacks
         def create_double_signed_message(origin, destination, message, global_time):
             origin_mid_pre = origin._community.my_member.mid
             destination_mid_pre = destination._community.my_member.mid
@@ -259,15 +262,16 @@ class TestSync(DispersyTestFunc):
             assert origin_mid_pre == origin._community.my_member.mid
             assert destination_mid_pre == destination._community.my_member.mid
 
-            destination.give_message(origin.create_signature_request(12345, submsg, global_time), origin)
+            yield destination.give_message(origin.create_signature_request(12345, submsg, global_time), origin)
             _, message = origin.receive_message(names=[u"dispersy-signature-response"]).next()
-            return (global_time, message.payload.message)
+            returnValue((global_time, message.payload.message))
 
         @inlineCallbacks
         def check_database_contents():
             # TODO(emilon): This could be done better.
+            @inlineCallbacks
             def fetch_rows():
-                return nodeA._dispersy.database.stormdb.fetchall(
+                rows = yield nodeA._dispersy.database.stormdb.fetchall(
                     u"SELECT sync.global_time, sync.member, double_signed_sync.member1, double_signed_sync.member2, "
                     u"member1.mid as mid1, member2.mid as mid2 FROM sync "
                     u"JOIN double_signed_sync ON double_signed_sync.sync = sync.id "
@@ -275,6 +279,7 @@ class TestSync(DispersyTestFunc):
                     u"JOIN member member2 ON double_signed_sync.member2 = member2.id "
                     u"WHERE sync.community = ? AND sync.member = ? AND sync.meta_message = ?",
                     (nodeA._community.database_id, nodeA.my_member.database_id, message.database_id))
+                returnValue(rows)
 
             entries = []
             database_ids = {}
@@ -307,25 +312,33 @@ class TestSync(DispersyTestFunc):
         global_time = 10
         other_global_time = global_time + 1
         messages = []
-        messages.append(create_double_signed_message(nodeA, nodeB, "Allow=True (1AB)", global_time))
-        messages.append(create_double_signed_message(nodeA, nodeC, "Allow=True (1AC)", other_global_time))
+        double_signed_sync_res = yield create_double_signed_message(nodeA, nodeB, "Allow=True (1AB)", global_time)
+        messages.append(double_signed_sync_res)
+        double_signed_sync_res = yield create_double_signed_message(nodeA, nodeC, "Allow=True (1AC)", other_global_time)
+        messages.append(double_signed_sync_res)
 
         # Send a newer set, the previous ones should be dropped
         # Those two are the messages that we should have in the DB at the end of the test.
         global_time = 20
         other_global_time = global_time + 1
-        messages.append(create_double_signed_message(nodeA, nodeB, "Allow=True (2AB) @%d" % global_time, global_time))
-        messages.append(create_double_signed_message(nodeA, nodeC, "Allow=True (2AC) @%d" % other_global_time, other_global_time))
+        double_signed_sync_res = yield create_double_signed_message(nodeA, nodeB, "Allow=True (2AB) @%d" % global_time, global_time)
+        messages.append(double_signed_sync_res)
+        double_signed_sync_res = yield create_double_signed_message(nodeA, nodeC, "Allow=True (2AC) @%d" % other_global_time, other_global_time)
+        messages.append(double_signed_sync_res)
 
         # Send another message (same global time: should be droped)
-        messages.append(create_double_signed_message(nodeA, nodeB, "Allow=True Duplicate global time (2ABbis) @%d" % global_time, global_time))
-        messages.append(create_double_signed_message(nodeA, nodeC, "Allow=True Duplicate global time (2ACbis) @%d" % other_global_time, other_global_time))
+        double_signed_sync_res = yield create_double_signed_message(nodeA, nodeB, "Allow=True Duplicate global time (2ABbis) @%d" % global_time, global_time)
+        messages.append(double_signed_sync_res)
+        double_signed_sync_res = yield create_double_signed_message(nodeA, nodeC, "Allow=True Duplicate global time (2ACbis) @%d" % other_global_time, other_global_time)
+        messages.append(double_signed_sync_res)
 
         # send yet another message (older: should be dropped too)
         old_global_time = 8
         other_old_global_time = old_global_time + 1
-        messages.append(create_double_signed_message(nodeA, nodeB, "Allow=True Should be dropped (1AB)", old_global_time))
-        messages.append(create_double_signed_message(nodeA, nodeC, "Allow=True Should be dropped (1AC)", other_old_global_time))
+        double_signed_sync_res = yield create_double_signed_message(nodeA, nodeB, "Allow=True Should be dropped (1AB)", old_global_time)
+        messages.append(double_signed_sync_res)
+        double_signed_sync_res = yield create_double_signed_message(nodeA, nodeC, "Allow=True Should be dropped (1AC)", other_old_global_time)
+        messages.append(double_signed_sync_res)
 
         current_global_timeB = 0
         current_global_timeC = 0
@@ -336,7 +349,7 @@ class TestSync(DispersyTestFunc):
             current_global_timeB = max(global_timeB, current_global_timeB)
             current_global_timeC = max(global_timeC, current_global_timeC)
 
-            nodeA.give_messages([messageB, messageC], nodeB)
+            yield nodeA.give_messages([messageB, messageC], nodeB)
             yield check_database_contents()
 
         # as proof for the drop, the more recent messages should be sent back to nodeB
@@ -348,7 +361,7 @@ class TestSync(DispersyTestFunc):
 
         # send a message (older + different member combination: should be dropped)
         old_global_time = 9
-        create_double_signed_message(nodeB, nodeA, "Allow=True (2BA)", old_global_time)
-        create_double_signed_message(nodeC, nodeA, "Allow=True (2CA)", old_global_time)
+        yield create_double_signed_message(nodeB, nodeA, "Allow=True (2BA)", old_global_time)
+        yield create_double_signed_message(nodeC, nodeA, "Allow=True (2CA)", old_global_time)
 
         yield check_database_contents()

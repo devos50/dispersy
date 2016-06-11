@@ -1,36 +1,47 @@
+from twisted.internet.defer import inlineCallbacks
+
 from .debugcommunity.community import DebugCommunity
 from .dispersytestclass import DispersyTestFunc
 
 
 class TestNeighborhood(DispersyTestFunc):
-
+    @inlineCallbacks
     def test_forward_1(self):
-        return self.forward(1)
+        yield self.forward(1)
 
+    @inlineCallbacks
     def test_forward_10(self):
-        return self.forward(10)
+        yield self.forward(10)
 
+    @inlineCallbacks
     def test_forward_2(self):
-        return self.forward(2)
+        yield self.forward(2)
 
+    @inlineCallbacks
     def test_forward_3(self):
-        return self.forward(3)
+        yield self.forward(3)
 
+    @inlineCallbacks
     def test_forward_20(self):
-        return self.forward(20)
+        yield self.forward(20)
 
+    @inlineCallbacks
     def test_forward_0_targeted_5(self):
-        return self.forward(0, 5)
+        yield self.forward(0, 5)
 
+    @inlineCallbacks
     def test_forward_0_targeted_20(self):
-        return self.forward(0, 20)
+        yield self.forward(0, 20)
 
+    @inlineCallbacks
     def test_forward_5_targeted_2(self):
-        return self.forward(5, 2)
+        yield self.forward(5, 2)
 
+    @inlineCallbacks
     def test_forward_2_targeted_5(self):
-        return self.forward(2, 5)
+        yield self.forward(2, 5)
 
+    @inlineCallbacks
     def forward(self, non_targeted_node_count, targeted_node_count=0):
         """
         SELF should forward created messages at least to the specified targets.
@@ -64,7 +75,7 @@ class TestNeighborhood(DispersyTestFunc):
         # SELF creates a message
         candidates = tuple((node.my_candidate for node in nodes[:targeted_node_count]))
         message = self._mm.create_targeted_full_sync_text("Hello World!", destination=candidates,  global_time=42)
-        self._dispersy._forward([message])
+        yield self._dispersy._forward([message])
 
         # check if sufficient NODES received the message (at least the first `target_count` ones)
         forwarded_node_count = 0

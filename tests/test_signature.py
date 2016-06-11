@@ -1,17 +1,20 @@
 from time import sleep
 
+from twisted.internet.defer import inlineCallbacks
+
 from .dispersytestclass import DispersyTestFunc
 
 
 class TestSignature(DispersyTestFunc):
 
+    @inlineCallbacks
     def test_invalid_public_key(self):
         """
         NODE sends a message containing an invalid public-key to OTHER.
         OTHER should drop it
         """
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         message = node.create_bin_key_text('Should drop')
         packet = node.encode_message(message)
@@ -24,17 +27,19 @@ class TestSignature(DispersyTestFunc):
         self.assertNotEqual(packet, invalid_packet)
 
         # give invalid message to OTHER
-        other.give_packet(invalid_packet, node)
+        yield other.give_packet(invalid_packet, node)
 
-        self.assertEqual(other.fetch_messages([u"bin-key-text", ]), [])
+        other_messages = yield other.fetch_messages([u"bin-key-text", ])
+        self.assertEqual(other_messages, [])
 
+    @inlineCallbacks
     def test_invalid_signature(self):
         """
         NODE sends a message containing an invalid signature to OTHER.
         OTHER should drop it
         """
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         message = node.create_full_sync_text('Should drop')
         packet = node.encode_message(message)
@@ -44,6 +49,7 @@ class TestSignature(DispersyTestFunc):
         self.assertNotEqual(packet, invalid_packet)
 
         # give invalid message to OTHER
-        other.give_packet(invalid_packet, node)
+        yield other.give_packet(invalid_packet, node)
 
-        self.assertEqual(other.fetch_messages([u"full-sync-text", ]), [])
+        other_messages = yield other.fetch_messages([u"full-sync-text", ])
+        self.assertEqual(other_messages, [])

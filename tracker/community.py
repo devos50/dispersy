@@ -1,3 +1,5 @@
+from twisted.internet.defer import returnValue, inlineCallbacks
+
 from ..community import Community, HardKilledCommunity
 from ..conversion import BinaryConversion
 from ..exception import ConversionNotFoundException
@@ -148,6 +150,7 @@ class TrackerCommunity(Community):
 
         return TrackerHardKilledCommunity
 
+    @inlineCallbacks
     def on_introduction_request(self, messages):
         if not self._dispersy._silent:
             hex_cid = self.cid.encode("HEX")
@@ -158,7 +161,8 @@ class TrackerCommunity(Community):
                 ord(message.conversion.dispersy_version),
                 ord(message.conversion.community_version), host, port
 
-        return super(TrackerCommunity, self).on_introduction_request(messages)
+        res = yield super(TrackerCommunity, self).on_introduction_request(messages)
+        returnValue(res)
 
     def on_introduction_response(self, messages):
         if not self._dispersy._silent:

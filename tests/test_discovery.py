@@ -1,7 +1,8 @@
+from twisted.internet.defer import inlineCallbacks
+
 from .dispersytestclass import DispersyTestFunc
-from ..discovery.community import DiscoveryCommunity, BOOTSTRAP_FILE_ENVNAME
+from ..discovery.community import DiscoveryCommunity
 from ..discovery.bootstrap import _DEFAULT_ADDRESSES
-import os
 import time
 
 
@@ -12,6 +13,7 @@ class TestDiscovery(DispersyTestFunc):
             _DEFAULT_ADDRESSES.pop()
         super(TestDiscovery, self).setUp()
 
+    @inlineCallbacks
     def test_overlap(self):
         def get_preferences():
             return ['0' * 20, '1' * 20]
@@ -20,14 +22,16 @@ class TestDiscovery(DispersyTestFunc):
         node,  = self.create_nodes(1)
         node._community.my_preferences = get_preferences
 
-        node.process_packets()
-        self._mm.process_packets()
+        yield node.process_packets()
+        yield self._mm.process_packets()
         time.sleep(1)
 
         assert node._community.is_taste_buddy_mid(self._mm.my_mid)
         assert self._mm._community.is_taste_buddy_mid(node.my_mid)
 
+    @inlineCallbacks
     def test_introduction(self):
+        @inlineCallbacks
         def get_preferences(node_index):
             return [str(i) * 20 for i in range(node_index, node_index + 2)]
 
@@ -37,13 +41,14 @@ class TestDiscovery(DispersyTestFunc):
             most_similar.append(orig_method(candidate))
             return most_similar[-1]
 
+        # TODO(laurens) get_preferences now returns a deferred.. is that ok?
         self._community.my_preferences = lambda: get_preferences(0)
 
         node,  = self.create_nodes(1)
         node._community.my_preferences = lambda: get_preferences(1)
 
-        node.process_packets()
-        self._mm.process_packets()
+        yield node.process_packets()
+        yield self._mm.process_packets()
         time.sleep(1)
 
         assert node._community.is_taste_buddy_mid(self._mm.my_mid)
@@ -56,10 +61,10 @@ class TestDiscovery(DispersyTestFunc):
 
         other._community.add_discovered_candidate(self._mm.my_candidate)
         # This calls take_step in debug node. This is wrapped in @blockincallfromthread so it's synchronous.
-        other.take_step()
+        yield other.take_step()
 
-        self._mm.process_packets()
-        other.process_packets()
+        yield self._mm.process_packets()
+        yield other.process_packets()
         time.sleep(1)
 
         # other and mm should not be taste buddies

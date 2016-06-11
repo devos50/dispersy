@@ -8,6 +8,8 @@ This module provides an interface to the Dispersy database.
 
 from itertools import groupby
 
+from twisted.internet.defer import inlineCallbacks, returnValue
+
 from .database import Database
 from .distribution import FullSyncDistribution
 
@@ -64,6 +66,7 @@ class DispersyDatabase(Database):
     if __debug__:
         __doc__ = schema
 
+    @inlineCallbacks
     def check_database(self, database_version):
         assert isinstance(database_version, unicode)
         assert database_version.isdigit()
@@ -173,7 +176,7 @@ class DispersyDatabase(Database):
                     u""" DROP INDEX IF EXISTS sync_meta_message_undone_global_time_index;""",
                     u"""DROP INDEX IF EXISTS sync_meta_message_member;"""])
 
-                old_sync = self.stormdb.fetchall(u"""
+                old_sync = yield self.stormdb.fetchall(u"""
                     SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'old_sync';""")
                 if old_sync:
                     # delete the sync table and start copying data again
@@ -223,8 +226,9 @@ class DispersyDatabase(Database):
                     u"""UPDATE option SET value = '21' WHERE key = 'database_version';"""])
                 self._logger.debug("upgrade database %d -> %d (done)", database_version, 21)
 
-        return LATEST_VERSION
+        returnValue(LATEST_VERSION)
 
+    @inlineCallbacks
     def check_community_database(self, community, database_version):
         assert isinstance(database_version, int)
         assert database_version >= 0
@@ -272,7 +276,7 @@ class DispersyDatabase(Database):
             # all meta messages that use sequence numbers
             metas = [meta for meta in community.get_meta_messages() if (
                 isinstance(meta.distribution, FullSyncDistribution) and meta.distribution.enable_sequence_number)]
-            convert_packet_to_message = community.dispersy.convert_packet_to_message
+            convert_packet_to_message = yield community.dispersy.convert_packet_to_message
 
             progress = 0
             count = 0
@@ -289,7 +293,7 @@ class DispersyDatabase(Database):
 
             sequence_updates = []
             for meta in metas:
-                rows = self.stormdb.fetchall(u"SELECT id, member, packet FROM sync "
+                rows = yield self.stormdb.fetchall(u"SELECT id, member, packet FROM sync "
                                          u"WHERE meta_message = ? ORDER BY member, global_time", (meta.database_id,))
                 groups = groupby(rows, key=lambda tup: tup[1])
                 for member_id, iterator in groups:
@@ -330,7 +334,7 @@ class DispersyDatabase(Database):
 
             # we may have removed some undo-other or undo-own messages.  we must ensure that there
             # are no messages in the database that point to these removed messages
-            updates = self.stormdb.fetchall(u"""
+            updates = yield self.stormdb.fetchall(u"""
             SELECT a.id
             FROM sync a
             LEFT JOIN sync b ON a.undone = b.id
@@ -343,4 +347,4 @@ class DispersyDatabase(Database):
             for handler in progress_handlers:
                 handler.Destroy()
 
-        return LATEST_VERSION
+        returnValue(LATEST_VERSION)

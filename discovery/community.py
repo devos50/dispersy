@@ -6,7 +6,7 @@ from random import random, shuffle
 from time import time
 
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.task import LoopingCall
 
 from ..authentication import MemberAuthentication, NoAuthentication
@@ -175,6 +175,7 @@ class PossibleTasteBuddy(TasteBuddy):
 
 class DiscoveryCommunity(Community):
 
+    @inlineCallbacks
     def initialize(self, max_prefs=25, max_tbs=25):
         self._logger.debug('initializing DiscoveryComunity, max_prefs = %d, max_tbs = %d', max_prefs, max_tbs)
 
@@ -215,7 +216,7 @@ class DiscoveryCommunity(Community):
         self.register_task('create_ping_requests',
                            LoopingCall(self.create_ping_requests)).start(PING_INTERVAL)
 
-        super(DiscoveryCommunity, self).initialize()
+        yield super(DiscoveryCommunity, self).initialize()
 
     def unload_community(self):
         super(DiscoveryCommunity, self).unload_community()
@@ -494,11 +495,12 @@ class DiscoveryCommunity(Community):
 
         send = False
         if not self.is_recent_taste_buddy(destination):
-            send = self.create_similarity_request(destination, allow_sync=allow_sync)
+            send = yield self.create_similarity_request(destination, allow_sync=allow_sync)
 
         if not send:
             yield self.send_introduction_request(destination, allow_sync=allow_sync)
 
+    @inlineCallbacks
     def create_similarity_request(self, destination, allow_sync=True):
         payload = self.my_preferences()[:self.max_prefs]
         if payload:
@@ -512,14 +514,15 @@ class DiscoveryCommunity(Community):
             request = meta_request.impl(authentication=(self.my_member,), distribution=(self.global_time,), destination=(destination,), payload=(
                 cache.number, self._dispersy.lan_address, self._dispersy.wan_address, self._dispersy.connection_type, payload))
 
-            if self._dispersy._forward([request]):
+            forward_result = yield self._dispersy._forward([request])
+            if forward_result:
                 self.send_packet_size += len(request.packet)
 
                 self._logger.debug("DiscoveryCommunity: sending similarity request to %s containing %d preferences: %s",
                                    destination, len(payload), [preference.encode('HEX') for preference in payload])
-            return True
+            returnValue(True)
 
-        return False
+        returnValue(False)
 
     def check_similarity_request(self, messages):
         for message in messages:
@@ -652,6 +655,7 @@ class DiscoveryCommunity(Community):
         self._logger.debug("DiscoveryCommunity: sending introduction-request to %s (%s,%s)", destination,
                            introduce_me_to.encode("HEX") if introduce_me_to else '', allow_sync)
 
+    @inlineCallbacks
     def on_introduction_request(self, messages):
         for message in messages:
             introduce_me_to = ''
@@ -667,7 +671,7 @@ class DiscoveryCommunity(Community):
                                message.payload.introduce_me_to.encode("HEX") if message.payload.introduce_me_to else '-',
                                introduce_me_to, self.requested_introductions)
 
-        super(DiscoveryCommunity, self).on_introduction_request(messages)
+        yield super(DiscoveryCommunity, self).on_introduction_request(messages)
 
     def get_tb_or_candidate_mid(self, mid):
         tb = self.is_taste_buddy_mid(mid)

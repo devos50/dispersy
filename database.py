@@ -10,6 +10,8 @@ import sys
 import thread
 from abc import ABCMeta, abstractmethod
 
+from twisted.internet.defer import inlineCallbacks, returnValue
+
 from StormDBManager import StormDBManager
 from .util import attach_runtime_statistics
 
@@ -18,6 +20,7 @@ if "--explain-query-plan" in getattr(sys, "argv", []):
     _explain_query_plan_logger = logging.getLogger("explain-query-plan")
     _explain_query_plan = set()
 
+    # TODO(Laurens): CHECK WHERE THIS IS USED AND WHAT IT DOES AS IT HAVE TO BE REFACTORED BECAUSE DEFERREDS.
     def attach_explain_query_plan(func):
         def attach_explain_query_plan_helper(self, statements, bindings=()):
             if not statements in _explain_query_plan:
@@ -92,6 +95,7 @@ class Database(object):
         if __debug__:
             self._debug_thread_ident = 0
 
+    @inlineCallbacks
     def open(self, initial_statements=True, prepare_visioning=True):
         assert self._cursor is None, "Database.open() has already been called"
         assert self._connection is None, "Database.open() has already been called"
@@ -103,8 +107,8 @@ class Database(object):
         if initial_statements:
             self._initial_statements()
         if prepare_visioning:
-            self._prepare_version()
-        return True
+            yield self._prepare_version()
+        returnValue(True)
 
     def close(self, commit=True):
         assert self._cursor is not None, "Database.close() has been called or Database.open() has not been called"
@@ -175,6 +179,7 @@ class Database(object):
         else:
             self._logger.debug("PRAGMA synchronous = %s (no change) [%s]", synchronous, self._file_path)
 
+    @inlineCallbacks
     def _prepare_version(self):
         assert self._cursor is not None, "Database.close() has been called or Database.open() has not been called"
         assert self._connection is not None, "Database.close() has been called or Database.open() has not been called"
@@ -196,7 +201,7 @@ class Database(object):
             # the 'option' table probably hasn't been created yet
             version = u"0"
 
-        self._database_version = self.check_database(version)
+        self._database_version = yield self.check_database(version)
         assert isinstance(self._database_version, (int, long)), type(self._database_version)
 
     @property

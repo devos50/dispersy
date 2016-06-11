@@ -58,7 +58,7 @@ class DispersyTestFunc(TestCase):
         super(DispersyTestFunc, self).tearDown()
 
         for dispersy in self.dispersy_objects:
-            dispersy.stop()
+            blockingCallFromThread(reactor, dispersy.stop)
 
             peercache = os.path.join(dispersy._working_directory, PEERCACHE_FILENAME)
             if os.path.isfile(peercache):
@@ -98,7 +98,8 @@ class DispersyTestFunc(TestCase):
                 working_directory = unicode(mkdtemp(suffix="_dispersy_test_session"))
 
                 dispersy = Dispersy(ManualEnpoint(0), working_directory, **memory_database_argument)
-                dispersy.start(autoload_discovery=autoload_discovery)
+                yield dispersy.initialize_statistics()
+                yield dispersy.start(autoload_discovery=autoload_discovery)
 
                 self.dispersy_objects.append(dispersy)
 

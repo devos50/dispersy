@@ -107,17 +107,17 @@ class TestPruning(DispersyTestFunc):
 
         # create 10 pruning messages
         prune1 = yield self._create_prune(node, 11, 20, store=False)
-        other.give_messages(prune1, node)
+        yield other.give_messages(prune1, node)
 
         # we need to let other fetch the messages
-        messages = other.fetch_messages([u"full-sync-global-time-pruning-text", ])
+        messages = yield other.fetch_messages([u"full-sync-global-time-pruning-text", ])
         self.assertTrue(all(message.distribution.pruning.is_active() for message in messages), "all messages should be active")
 
         # create 10 pruning messages
         prune2 = yield self._create_prune(node, 21, 30, store=False)
-        other.give_messages(prune2, node)
+        yield other.give_messages(prune2, node)
 
-        messages = other.fetch_messages([u"full-sync-global-time-pruning-text", ])
+        messages = yield other.fetch_messages([u"full-sync-global-time-pruning-text", ])
         should_be_inactive = [message for message in messages if message.distribution.global_time <= 20]
         should_be_active = [message for message in messages if 20 < message.distribution.global_time <= 30]
         self.assertTrue(all(message.distribution.pruning.is_inactive() for message in should_be_inactive), "all messages should be inactive")
@@ -125,9 +125,9 @@ class TestPruning(DispersyTestFunc):
 
         # create 10 pruning messages
         messages = yield self._create_prune(node, 31, 40, store=False)
-        other.give_messages(messages, node)
+        yield other.give_messages(messages, node)
 
-        messages = other.fetch_messages([u"full-sync-global-time-pruning-text", ])
+        messages = yield other.fetch_messages([u"full-sync-global-time-pruning-text", ])
         should_be_pruned = [message for message in messages if message.distribution.global_time <= 20]
         should_be_inactive = [message for message in messages if 20 < message.distribution.global_time <= 30]
         should_be_active = [message for message in messages if 30 < message.distribution.global_time <= 40]
@@ -156,23 +156,23 @@ class TestPruning(DispersyTestFunc):
 
         # create 10 pruning messages
         messages = yield self._create_prune(node, 11, 20, store=False)
-        other.give_messages(messages, node)
+        yield other.give_messages(messages, node)
 
-        messages = other.fetch_messages([u"full-sync-global-time-pruning-text", ])
+        messages = yield other.fetch_messages([u"full-sync-global-time-pruning-text", ])
         self.assertTrue(all(message.distribution.pruning.is_active() for message in messages), "all messages should be active")
 
         # create 10 normal messages
         normal1  = yield self._create_normal(node, 21, 30, store=False)
-        other.give_messages(normal1, node)
+        yield other.give_messages(normal1, node)
 
-        messages = other.fetch_messages([u"full-sync-global-time-pruning-text", ])
+        messages = yield other.fetch_messages([u"full-sync-global-time-pruning-text", ])
         self.assertTrue(all(message.distribution.pruning.is_inactive() for message in messages), "all messages should be inactive")
 
         # create 10 normal messages
         normal2 = yield self._create_normal(node, 31, 40, store=False)
-        other.give_messages(normal2, node)
+        yield other.give_messages(normal2, node)
 
-        messages = other.fetch_messages([u"full-sync-global-time-pruning-text", ])
+        messages = yield other.fetch_messages([u"full-sync-global-time-pruning-text", ])
         self.assertTrue(all(message.distribution.pruning.is_pruned() for message in messages), "all messages should be pruned")
 
         # pruned messages should no longer exist in the database
@@ -196,7 +196,7 @@ class TestPruning(DispersyTestFunc):
         self.assertEqual(meta.distribution.pruning.prune_threshold, 20, "check message configuration")
 
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         # OTHER creates 20 messages
         messages = yield self._create_prune(other, 11, 30)
@@ -206,7 +206,7 @@ class TestPruning(DispersyTestFunc):
         # NODE requests missing messages
         sync = (1, 0, 1, 0, [])
         global_time = 1  # ensure we do not increase the global time, causing further pruning
-        other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42, global_time), node)
+        yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42, global_time), node)
 
         # OTHER should return the 10 active messages
         responses = [response for _, response in node.receive_messages(names=[u"full-sync-global-time-pruning-text"])]
@@ -222,7 +222,7 @@ class TestPruning(DispersyTestFunc):
         # NODE requests missing messages
         sync = (1, 0, 1, 0, [])
         global_time = 1  # ensure we do not increase the global time, causing further pruning
-        other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42, global_time), node)
+        yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42, global_time), node)
 
         # OTHER should return the 5 active pruning messages
         responses = [response for _, response in node.receive_messages(names=[u"full-sync-global-time-pruning-text"])]

@@ -1,10 +1,13 @@
 from collections import defaultdict
 
+from twisted.internet.defer import inlineCallbacks
+
 from .dispersytestclass import DispersyTestFunc
 
 
 class TestIncomingMissingSequence(DispersyTestFunc):
-
+    @inlineCallbacks
+    # TODO(Laurens): This is not called?
     def incoming_simple_conflict_different_global_time(self):
         """
         A broken NODE creates conflicting messages with the same sequence number that OTHER should
@@ -17,7 +20,7 @@ class TestIncomingMissingSequence(DispersyTestFunc):
 
         """
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         msgs = defaultdict(dict)
         def get_message(global_time, seq):
@@ -26,46 +29,46 @@ class TestIncomingMissingSequence(DispersyTestFunc):
             return msgs[global_time][seq]
 
         # NODE must accept M@6#1
-        other.give_message(get_message(6, 1), node)
+        yield other.give_message(get_message(6, 1), node)
         other.assert_is_stored(get_message(6, 1))
 
         # NODE must reject M@6#1 (already have this message)
-        other.give_message(get_message(6, 1), node)
+        yield other.give_message(get_message(6, 1), node)
         other.assert_is_stored(get_message(6, 1))
 
         # NODE must prefer M@5#1 (duplicate sequence number, prefer lower global time)
-        other.give_message(get_message(5, 1), node)
+        yield other.give_message(get_message(5, 1), node)
         other.assert_is_stored(get_message(5, 1))
         other.assert_not_stored(get_message(6, 1))
 
         # NODE must reject M@6#1 (duplicate sequence number, prefer lower global time)
-        other.give_message(get_message(6, 1), node)
+        yield other.give_message(get_message(6, 1), node)
         other.assert_is_stored(get_message(5, 1))
         other.assert_not_stored(get_message(6, 1))
 
         # NODE must reject M@4#2 (global time is lower than previous global time in sequence)
-        other.give_message(get_message(4, 2), node)
+        yield other.give_message(get_message(4, 2), node)
         other.assert_is_stored(get_message(5, 1))
         other.assert_not_stored(get_message(4, 2))
 
         # NODE must reject M@5#2 (duplicate global time)
-        other.give_message(get_message(5, 2), node)
+        yield other.give_message(get_message(5, 2), node)
         other.assert_is_stored(get_message(5, 1))
         other.assert_not_stored(get_message(5, 2))
 
         # NODE must accept M@7#2
-        other.give_message(get_message(6, 2), node)
+        yield other.give_message(get_message(6, 2), node)
         other.assert_is_stored(get_message(5, 1))
         other.assert_is_stored(get_message(6, 2))
 
         # NODE must accept M@8#3
-        other.give_message(get_message(8, 3), node)
+        yield other.give_message(get_message(8, 3), node)
         other.assert_is_stored(get_message(5, 1))
         other.assert_is_stored(get_message(6, 2))
         other.assert_is_stored(get_message(8, 3))
 
         # NODE must accept M@9#4
-        other.give_message(get_message(9, 4), node)
+        yield other.give_message(get_message(9, 4), node)
         other.assert_is_stored(get_message(5, 1))
         other.assert_is_stored(get_message(6, 2))
         other.assert_is_stored(get_message(8, 3))
@@ -77,117 +80,151 @@ class TestIncomingMissingSequence(DispersyTestFunc):
         # have to delete).  In the future we can optimize by pushing the newer messages (such as
         # M@7#3) into the waiting or incoming packet queue, this will allow them to be re-inserted
         # after M@6#2 has been fully accepted.
-        other.give_message(get_message(7, 3), node)
+        yield other.give_message(get_message(7, 3), node)
         other.assert_is_stored(get_message(5, 1))
         other.assert_is_stored(get_message(6, 2))
         other.assert_is_stored(get_message(7, 3))
 
+    @inlineCallbacks
     def test_requests_1_1(self):
-        self.requests(1, [1], (1, 1))
+        yield self.requests(1, [1], (1, 1))
 
+    @inlineCallbacks
     def test_requests_1_2(self):
-        self.requests(1, [10], (10, 10))
+        yield self.requests(1, [10], (10, 10))
 
+    @inlineCallbacks
     def test_requests_1_3(self):
-        self.requests(1, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], (1, 10))
+        yield self.requests(1, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], (1, 10))
 
+    @inlineCallbacks
     def test_requests_1_4(self):
-        self.requests(1, [3, 4, 5, 6, 7, 8, 9, 10], (3, 10))
+        yield self.requests(1, [3, 4, 5, 6, 7, 8, 9, 10], (3, 10))
 
+    @inlineCallbacks
     def test_requests_1_5(self):
-        self.requests(1, [1, 2, 3, 4, 5, 6, 7], (1, 7))
+        yield self.requests(1, [1, 2, 3, 4, 5, 6, 7], (1, 7))
 
+    @inlineCallbacks
     def test_requests_1_6(self):
-        self.requests(1, [3, 4, 5, 6, 7], (3, 7))
+        yield self.requests(1, [3, 4, 5, 6, 7], (3, 7))
 
     def test_requests_2_1(self):
-        self.requests(2, [1], (1, 1))
+        yield self.requests(2, [1], (1, 1))
 
+    @inlineCallbacks
     def test_requests_2_2(self):
-        self.requests(2, [10], (10, 10))
+        yield self.requests(2, [10], (10, 10))
 
+    @inlineCallbacks
     def test_requests_2_3(self):
-        self.requests(2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], (1, 10))
+        yield self.requests(2, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], (1, 10))
 
+    @inlineCallbacks
     def test_requests_2_4(self):
-        self.requests(2, [3, 4, 5, 6, 7, 8, 9, 10], (3, 10))
+        yield self.requests(2, [3, 4, 5, 6, 7, 8, 9, 10], (3, 10))
 
+    @inlineCallbacks
     def test_requests_2_5(self):
-        self.requests(2, [1, 2, 3, 4, 5, 6, 7], (1, 7))
+        yield self.requests(2, [1, 2, 3, 4, 5, 6, 7], (1, 7))
 
+    @inlineCallbacks
     def test_requests_2_6(self):
-        self.requests(2, [3, 4, 5, 6, 7], (3, 7))
+        yield self.requests(2, [3, 4, 5, 6, 7], (3, 7))
 
     # multi-range requests
+    @inlineCallbacks
     def test_requests_1_7(self):
-        self.requests(1, [1], (1, 1), (1, 1), (1, 1))
+        yield self.requests(1, [1], (1, 1), (1, 1), (1, 1))
 
+    @inlineCallbacks
     def test_requests_1_9(self):
-        self.requests(1, [1, 2, 3, 4, 5], (1, 2), (2, 3), (3, 4), (4, 5))
+        yield self.requests(1, [1, 2, 3, 4, 5], (1, 2), (2, 3), (3, 4), (4, 5))
 
+    @inlineCallbacks
     def test_requests_1_11(self):
-        self.requests(1, [1, 2, 4, 5, 7, 8], (1, 2), (4, 5), (7, 8))
+        yield self.requests(1, [1, 2, 4, 5, 7, 8], (1, 2), (4, 5), (7, 8))
 
+    @inlineCallbacks
     def test_requests_2_7(self):
-        self.requests(2, [1], (1, 1), (1, 1), (1, 1))
+        yield self.requests(2, [1], (1, 1), (1, 1), (1, 1))
 
+    @inlineCallbacks
     def test_requests_2_9(self):
-        self.requests(2, [1, 2, 3, 4, 5], (1, 2), (2, 3), (3, 4), (4, 5))
+        yield self.requests(2, [1, 2, 3, 4, 5], (1, 2), (2, 3), (3, 4), (4, 5))
 
+    @inlineCallbacks
     def test_requests_2_11(self):
-        self.requests(2, [1, 2, 4, 5, 7, 8], (1, 2), (4, 5), (7, 8))
+        yield self.requests(2, [1, 2, 4, 5, 7, 8], (1, 2), (4, 5), (7, 8))
 
     # multi-range requests, in different orders
+    @inlineCallbacks
     def test_requests_1_13(self):
-        self.requests(1, [1], (1, 1), (1, 1), (1, 1))
+        yield self.requests(1, [1], (1, 1), (1, 1), (1, 1))
 
+    @inlineCallbacks
     def test_requests_1_15(self):
-        self.requests(1, [1, 2, 3, 4, 5], (4, 5), (3, 4), (1, 2), (2, 3))
+        yield self.requests(1, [1, 2, 3, 4, 5], (4, 5), (3, 4), (1, 2), (2, 3))
 
+    @inlineCallbacks
     def test_requests_1_16(self):
-        self.requests(1, [1, 5], (5, 5), (1, 1))
+        yield self.requests(1, [1, 5], (5, 5), (1, 1))
 
+    @inlineCallbacks
     def test_requests_1_17(self):
-        self.requests(1, [1, 2, 4, 5, 7, 8], (1, 2), (7, 8), (4, 5))
+        yield self.requests(1, [1, 2, 4, 5, 7, 8], (1, 2), (7, 8), (4, 5))
 
+    @inlineCallbacks
     def test_requests_2_13(self):
-        self.requests(2, [1], (1, 1), (1, 1), (1, 1))
+        yield self.requests(2, [1], (1, 1), (1, 1), (1, 1))
 
+    @inlineCallbacks
     def test_requests_2_15(self):
-        self.requests(2, [1, 2, 3, 4, 5], (4, 5), (3, 4), (1, 2), (2, 3))
+        yield self.requests(2, [1, 2, 3, 4, 5], (4, 5), (3, 4), (1, 2), (2, 3))
 
+    @inlineCallbacks
     def test_requests_2_16(self):
-        self.requests(2, [1, 5], (5, 5), (1, 1))
+        yield self.requests(2, [1, 5], (5, 5), (1, 1))
 
+    @inlineCallbacks
     def test_requests_2_17(self):
-        self.requests(2, [1, 2, 4, 5, 7, 8], (1, 2), (7, 8), (4, 5))
+        yield self.requests(2, [1, 2, 4, 5, 7, 8], (1, 2), (7, 8), (4, 5))
 
     # single range requests, invalid requests
+    @inlineCallbacks
     def test_requests_1_19(self):
-        self.requests(1, [10], (10, 11))
+        yield self.requests(1, [10], (10, 11))
 
+    @inlineCallbacks
     def test_requests_1_20(self):
-        self.requests(1, [], (11, 11))
+        yield self.requests(1, [], (11, 11))
 
+    @inlineCallbacks
     def test_requests_2_19(self):
-        self.requests(2, [10], (10, 11))
+        yield self.requests(2, [10], (10, 11))
 
+    @inlineCallbacks
     def test_requests_2_20(self):
-        self.requests(2, [], (11, 11))
+        yield self.requests(2, [], (11, 11))
 
     # multi-range requests, invalid requests
+    @inlineCallbacks
     def test_requests_1_23(self):
-        self.requests(1, [10], (10, 11), (10, 100), (50, 75))
+        yield self.requests(1, [10], (10, 11), (10, 100), (50, 75))
 
+    @inlineCallbacks
     def test_requests_1_24(self):
-        self.requests(1, [], (11, 11), (11, 50), (100, 200))
+        yield self.requests(1, [], (11, 11), (11, 50), (100, 200))
 
+    @inlineCallbacks
     def test_requests_2_23(self):
-        self.requests(2, [10], (10, 11), (10, 100), (50, 75))
+        yield self.requests(2, [10], (10, 11), (10, 100), (50, 75))
 
+    @inlineCallbacks
     def test_requests_2_24(self):
-        self.requests(2, [], (11, 11), (11, 50), (100, 200))
+        yield self.requests(2, [], (11, 11), (11, 50), (100, 200))
 
+    @inlineCallbacks
     def requests(self, node_count, expected_responses, *pairs):
         """
         NODE1 through NODE<NODE_COUNT> requests OTHER (non)overlapping sequences, OTHER should send back the requested messages
@@ -196,7 +233,7 @@ class TestIncomingMissingSequence(DispersyTestFunc):
         other, = self.create_nodes(1)
         nodes = self.create_nodes(node_count)
         for node in nodes:
-            other.send_identity(node)
+            yield other.send_identity(node)
 
         messages = [other.create_sequence_text("Sequence message #%d" % i, i + 10, i) for i in range(1, 11)]
         other.store(messages)
@@ -206,12 +243,13 @@ class TestIncomingMissingSequence(DispersyTestFunc):
         rmessages = defaultdict(list)
         for low, high in pairs:
             for node in nodes:
-                rmessages[node].append(node.create_missing_sequence(other.my_member, messages[0].meta, low, high))
+                missing_sequence = yield node.create_missing_sequence(other.my_member, messages[0].meta, low, high)
+                rmessages[node].append(missing_sequence)
 
         # then, send them to other
         for node in nodes:
             for message in rmessages[node]:
-                other.give_message(message, node, cache=True)
+                yield other.give_message(message, node, cache=True)
 
         # receive response
         for node in nodes:
@@ -223,20 +261,20 @@ class TestIncomingMissingSequence(DispersyTestFunc):
 
 
 class TestOutgoingMissingSequence(DispersyTestFunc):
-
+    @inlineCallbacks
     def test_missing(self):
         """
         NODE sends message while OTHER doesn't have the prior sequence numbers, OTHER should request these messages.
         """
         node, other = self.create_nodes(2)
-        other.send_identity(node)
+        yield other.send_identity(node)
 
         messages = [node.create_sequence_text("Sequence message #%d" % sequence, sequence + 10, sequence)
                     for sequence
                     in range(1, 11)]
 
         # NODE gives #5, hence OTHER will request [#1:#4]
-        other.give_message(messages[4], node)
+        yield other.give_message(messages[4], node)
         requests = node.receive_messages(names=[u"dispersy-missing-sequence"])
         self.assertEqual(len(requests), 1)
 
@@ -247,13 +285,13 @@ class TestOutgoingMissingSequence(DispersyTestFunc):
         self.assertEqual(request.payload.missing_high, 4)
 
         # NODE gives the missing packets, database should now contain [#1:#5]
-        other.give_messages(messages[0:4], node)
+        yield other.give_messages(messages[0:4], node)
 
         for message in messages[0:5]:
             other.assert_is_stored(message)
 
         # NODE gives #10, hence OTHER will request [#6:#9]
-        other.give_message(messages[9], node)
+        yield other.give_message(messages[9], node)
         requests = node.receive_messages(names=[u"dispersy-missing-sequence"])
         self.assertEqual(len(requests), 1)
 
@@ -264,7 +302,7 @@ class TestOutgoingMissingSequence(DispersyTestFunc):
         self.assertEqual(request.payload.missing_high, 9)
 
         # NODE gives the missing packets, database should now contain [#1:#10]
-        other.give_messages(messages[5:9], node)
+        yield other.give_messages(messages[5:9], node)
 
         for message in messages:
             other.assert_is_stored(message)

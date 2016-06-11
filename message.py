@@ -2,6 +2,9 @@ import logging
 from abc import ABCMeta, abstractmethod, abstractproperty
 from time import time
 
+from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import returnValue
+
 from .authentication import Authentication
 from .candidate import Candidate, LoopbackCandidate
 from .destination import Destination
@@ -82,9 +85,11 @@ class DelayPacketByMissingMember(DelayPacket):
     def match_info(self):
         return (self._cid, u"dispersy-identity", self._missing_member_id, None, []),
 
+    @inlineCallbacks
     def send_request(self, community, candidate):
-        return community.create_missing_identity(candidate,
+        missing_identity = yield community.create_missing_identity(candidate,
                     community.dispersy.get_member(mid=self._missing_member_id))
+        returnValue(missing_identity)
 
 
 class DelayPacketByMissingMessage(DelayPacket):
@@ -100,8 +105,10 @@ class DelayPacketByMissingMessage(DelayPacket):
     def match_info(self):
         return (self._cid, None, self._member.mid, self._global_time, []),
 
+    @inlineCallbacks
     def send_request(self, community, candidate):
-        return community.create_missing_message(candidate, self._member, self._global_time)
+        missing_message = yield community.create_missing_message(candidate, self._member, self._global_time)
+        returnValue(missing_message)
 
 
 class DropPacket(Exception):
@@ -140,8 +147,9 @@ class DelayMessageByProof(DelayMessage):
     def resume_immediately(self):
         return True
 
+    @inlineCallbacks
     def send_request(self, community, candidate):
-        community.create_missing_proof(candidate, self._delayed)
+        yield community.create_missing_proof(candidate, self._delayed)
 
 
 class DelayMessageBySequence(DelayMessage):
@@ -161,8 +169,9 @@ class DelayMessageBySequence(DelayMessage):
     def match_info(self):
         return (self._cid, None, self._delayed.authentication.member.mid, None, range(self._missing_low, self._missing_high + 1)),
 
+    @inlineCallbacks
     def send_request(self, community, candidate):
-        community.create_missing_sequence(candidate, self._delayed.authentication.member,
+        yield community.create_missing_sequence(candidate, self._delayed.authentication.member,
                                           self._delayed.meta, self._missing_low, self._missing_high)
 
 
@@ -182,8 +191,9 @@ class DelayMessageByMissingMessage(DelayMessage):
     def match_info(self):
         return (self._cid, None, self._member.mid, self._global_time, []),
 
+    @inlineCallbacks
     def send_request(self, community, candidate):
-        community.create_missing_message(candidate, self._member, self._global_time)
+        yield community.create_missing_message(candidate, self._member, self._global_time)
 
 
 class DropMessage(Exception):
@@ -287,7 +297,7 @@ class Packet(MetaObject.Implementation):
 
     @property
     def delay(self):
-        return self._meta._delay
+        return self._meta._delay # TODO(Laurens): this function retuns a deferred.. but a pointer is returned here, is that ok? It's not used though.
 
     @property
     def packet(self):
@@ -302,10 +312,11 @@ class Packet(MetaObject.Implementation):
         assert isinstance(packet_id, (int, long))
         self._packet_id = packet_id
 
+    @inlineCallbacks
     def load_message(self):
-        message = self._meta.community.dispersy.convert_packet_to_message(self._packet, self._meta.community, verify=False)
+        message = yield self._meta.community.dispersy.convert_packet_to_message(self._packet, self._meta.community, verify=False)
         message.packet_id = self._packet_id
-        return message
+        returnValue(message)
 
     def __str__(self):
         return "<%s.%s %s %dbytes>" % (self._meta.__class__.__name__, self.__class__.__name__, self._meta._name, len(self._packet))

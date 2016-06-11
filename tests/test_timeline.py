@@ -13,7 +13,7 @@ class TestTimeline(DispersyTestFunc):
         dispersy-missing-proof message to try to obtain the dispersy-authorize.
         """
         node, other = self.create_nodes(2)
-        node.send_identity(other)
+        yield node.send_identity(other)
 
         # permit NODE
         proof_msg = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
@@ -21,7 +21,7 @@ class TestTimeline(DispersyTestFunc):
 
         # NODE creates message
         tmessage = node.create_protected_full_sync_text("Protected message", 42)
-        other.give_message(tmessage, node)
+        yield other.give_message(tmessage, node)
 
         # must NOT have been stored in the database
         other.assert_not_stored(tmessage)
@@ -35,7 +35,7 @@ class TestTimeline(DispersyTestFunc):
             self.assertEqual(message.payload.global_time, 42)
 
         # NODE provides proof
-        other.give_message(proof_msg, node)
+        yield other.give_message(proof_msg, node)
 
         # must have been stored in the database
         other.assert_is_stored(tmessage)
@@ -46,18 +46,18 @@ class TestTimeline(DispersyTestFunc):
         When OTHER receives a dispersy-missing-proof message it needs to find and send the proof.
         """
         node, other = self.create_nodes(2)
-        node.send_identity(other)
+        yield node.send_identity(other)
 
         # permit NODE
         authorize = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
                                                (node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"authorize")])
-        node.give_message(authorize, self._mm)
+        yield node.give_message(authorize, self._mm)
 
         protected_text = node.create_protected_full_sync_text("Protected message", 42)
         yield node.store([protected_text])
 
         # OTHER pretends to received the protected message and requests the proof
-        node.give_message(other.create_missing_proof(node.my_member, 42), other)
+        yield node.give_message(other.create_missing_proof(node.my_member, 42), other)
 
         # NODE sends dispersy-authorize to OTHER
         _, authorize = other.receive_message(names=[u"dispersy-authorize"]).next()
@@ -81,15 +81,15 @@ class TestTimeline(DispersyTestFunc):
         the dispersy-authorize message for authorize(MASTER, MM) must be returned.
         """
         node, other = self.create_nodes(2)
-        node.send_identity(other)
+        yield node.send_identity(other)
 
         # permit NODE
         authorize = yield self._mm.create_authorize([(node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"permit"),
                                              (node.my_member, self._community.get_meta_message(u"protected-full-sync-text"), u"authorize")])
-        node.give_message(authorize, self._mm)
+        yield node.give_message(authorize, self._mm)
 
         # OTHER wants the proof that OWNER is allowed to grant authorization to NODE
-        node.give_message(other.create_missing_proof(authorize.authentication.member, authorize.distribution.global_time), other)
+        yield node.give_message(other.create_missing_proof(authorize.authentication.member, authorize.distribution.global_time), other)
 
         # NODE sends dispersy-authorize containing authorize(MASTER, OWNER) to OTHER
         _, authorize = other.receive_message(names=[u"dispersy-authorize"]).next()

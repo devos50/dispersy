@@ -31,6 +31,7 @@ MAX_RTT = 0.5
 class TestBootstrapServers(DispersyTestFunc):
 
     @unittest.skip("Very unstable, ERRORS > 80% of the time")
+    @inlineCallbacks
     def test_tracker(self):
         """
         Runs tracker.py and connects to it.
@@ -90,7 +91,7 @@ class TestBootstrapServers(DispersyTestFunc):
 
             # node sends introduction request
             destination = Candidate(tracker_address, False)
-            node.send_message(node.create_introduction_request(destination=destination,
+            yield node.send_message(node.create_introduction_request(destination=destination,
                                                                source_lan=node.lan_address,
                                                                source_wan=node.wan_address,
                                                                advice=True,
@@ -104,10 +105,10 @@ class TestBootstrapServers(DispersyTestFunc):
             _, message = node.receive_message(names=[u"dispersy-missing-identity"]).next()
             self.assertEqual(message.payload.mid, node.my_member.mid)
 
-            packet = node.fetch_packets([u"dispersy-identity", ], node.my_member.mid)[0]
-            node.send_packet(packet, destination)
+            packet = yield node.fetch_packets([u"dispersy-identity", ], node.my_member.mid)[0]
+            yield node.send_packet(packet, destination)
 
-            node.process_packets()
+            yield node.process_packets()
 
             _, message = node.receive_message(names=[u"dispersy-identity"]).next()
 
@@ -237,11 +238,12 @@ class TestBootstrapServers(DispersyTestFunc):
         @inlineCallbacks
         def do_pings():
             dispersy = Dispersy(StandaloneEndpoint(0), u".", u":memory:")
-            dispersy.start(autoload_discovery=True)
+            yield dispersy.initialize_statistics()
+            yield dispersy.start(autoload_discovery=True)
             self.dispersy_objects.append(dispersy)
             community = yield PingCommunity.create_community(dispersy, dispersy.get_new_member())
             yield community.test_d
-            dispersy.stop()
+            yield dispersy.stop()
             returnValue(community)
 
         assert_margin = 0.9
@@ -338,9 +340,10 @@ class TestBootstrapServers(DispersyTestFunc):
                 finally:
                     self._my_member = self._original_my_member
 
+            @inlineCallbacks
             def ping_from_queue(self, count):
                 for identifier, packet, candidate in self._queue[:count]:
-                    self._dispersy.endpoint.send([candidate], [packet])
+                    yield self._dispersy.endpoint.send([candidate], [packet])
                     self._request[candidate.sock_addr][identifier] = time()
 
                 self._queue = self._queue[count:]
@@ -401,7 +404,7 @@ class TestBootstrapServers(DispersyTestFunc):
         for _ in xrange(ROUNDS):
             for community in communities:
                 for _ in xrange(MEMBERS / 100):
-                    community.ping_from_queue(100)
+                    yield community.ping_from_queue(100)
                     sleep(0.1)
 
             for community in communities:
@@ -416,4 +419,5 @@ class TestBootstrapServers(DispersyTestFunc):
 
         # cleanup
         yield community.create_destroy_community(u"hard-kill")
-        self._dispersy.get_community(community.cid).unload_community()
+        community = yield self._dispersy.get_community(community.cid)
+        community.unload_community()

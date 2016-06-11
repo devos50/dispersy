@@ -77,10 +77,11 @@ class TestOverlay(DispersyTestFunc):
         cid = cid_hex.decode("HEX")
 
         dispersy = Dispersy(StandaloneEndpoint(0), u".", u":memory:")
-        dispersy.start(autoload_discovery=True)
+        yield dispersy.initialize_statistics()
+        yield dispersy.start(autoload_discovery=True)
         dispersy.statistics.enable_debug_statistics(True)
         self.dispersy_objects.append(dispersy)
-        community = WCommunity.init_community(dispersy, dispersy.get_member(mid=cid), dispersy.get_new_member())
+        community = yield WCommunity.init_community(dispersy, dispersy.get_member(mid=cid), dispersy.get_new_member())
         summary_logger.info(community.cid.encode("HEX"))
         history = []
         begin = time()
@@ -109,7 +110,7 @@ class TestOverlay(DispersyTestFunc):
                                 len([_ for _, category in info.candidates if category == u"discovered"]),
                                 len([_ for _, category in info.candidates if category is None]))
 
-        dispersy.statistics.update()
+        yield dispersy.statistics.update()
         summary_logger.debug("\n%s", pformat(dispersy.statistics.get_dict()))
 
         # write graph statistics

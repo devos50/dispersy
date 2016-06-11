@@ -10,6 +10,7 @@ from .dispersytestclass import DispersyTestFunc
 class TestClassification(DispersyTestFunc):
 
     @call_on_reactor_thread
+    @inlineCallbacks
     def test_reclassify_unloaded_community(self):
         """
         Load a community, reclassify it, load all communities of that classification to check.
@@ -30,7 +31,7 @@ class TestClassification(DispersyTestFunc):
                                                classification=ClassTestA.get_classification())
 
         # reclassify
-        community = self._dispersy.reclassify_community(master, ClassTestB)
+        community = yield self._dispersy.reclassify_community(master, ClassTestB)
         self.assertIsInstance(community, ClassTestB)
         self.assertEqual(community.cid, master.mid)
         try:
@@ -59,7 +60,7 @@ class TestClassification(DispersyTestFunc):
                                                                   (ClassTestC.get_classification(),))[0], 1)
 
         # reclassify
-        community_d = self._dispersy.reclassify_community(community_c, ClassTestD)
+        community_d = yield self._dispersy.reclassify_community(community_c, ClassTestD)
         self.assertIsInstance(community_d, ClassTestD)
         self.assertEqual(community_c.cid, community_d.cid)
 
@@ -71,6 +72,7 @@ class TestClassification(DispersyTestFunc):
         self.assertEqual(classification, ClassTestD.get_classification())
 
     @call_on_reactor_thread
+    @inlineCallbacks
     def test_load_one_communities(self):
         """
         Try to load communities of a certain classification while there is exactly one such
@@ -89,8 +91,9 @@ class TestClassification(DispersyTestFunc):
                                                classification=ClassificationLoadOneCommunities.get_classification())
 
         # load one community
+        master_members = yield ClassificationLoadOneCommunities.get_master_members(self._dispersy)
         communities = [ClassificationLoadOneCommunities(self._dispersy, master, self._mm._my_member)
-                       for master in ClassificationLoadOneCommunities.get_master_members(self._dispersy)]
+                       for master in master_members]
         self.assertEqual(len(communities), 1)
         self.assertIsInstance(communities[0], ClassificationLoadOneCommunities)
 
@@ -116,10 +119,11 @@ class TestClassification(DispersyTestFunc):
         community.unload_community()
 
         # load two communities
+        master_members = yield LoadTwoCommunities.get_master_members(self._dispersy)
         self.assertEqual(sorted(masters), sorted(master.public_key
-                                                 for master in LoadTwoCommunities.get_master_members(self._dispersy)))
+                                                 for master in master_members))
         communities = [LoadTwoCommunities(self._dispersy, master, self._mm._my_member)
-                       for master in LoadTwoCommunities.get_master_members(self._dispersy)]
+                       for master in master_members]
 
         self.assertEqual(sorted(masters), sorted(community.master_member.public_key for community in communities))
         self.assertEqual(len(communities), 2)
@@ -127,6 +131,7 @@ class TestClassification(DispersyTestFunc):
         self.assertIsInstance(communities[1], LoadTwoCommunities)
 
     @call_on_reactor_thread
+    @inlineCallbacks
     def test_enable_autoload(self, auto_load=True):
         """
         Test enable autoload.
@@ -148,7 +153,7 @@ class TestClassification(DispersyTestFunc):
 
         if auto_load:
             # define auto load
-            self._dispersy.define_auto_load(DebugCommunity, my_member)
+            yield self._dispersy.define_auto_load(DebugCommunity, my_member)
 
         # create wake-up message
         wakeup = self._mm.create_full_sync_text("Should auto-load", 42)
@@ -157,19 +162,19 @@ class TestClassification(DispersyTestFunc):
         self._community.unload_community()
 
         try:
-            self._dispersy.get_community(cid, auto_load=False)
+            yield self._dispersy.get_community(cid, auto_load=False)
             self.fail()
         except CommunityNotFoundException:
             pass
 
         # send wakeup message
-        self._mm.give_message(wakeup, self._mm)
+        yield self._mm.give_message(wakeup, self._mm)
 
         yield 0.11
 
         # verify that the community got auto-loaded
         try:
-            _ = self._dispersy.get_community(cid, auto_load=False)
+            _ = yield self._dispersy.get_community(cid, auto_load=False)
 
             if not auto_load:
                 self.fail('Should not have been loaded by wakeup message')
@@ -180,5 +185,6 @@ class TestClassification(DispersyTestFunc):
         # verify that the message was received
         self._mm.assert_count(wakeup, 1 if auto_load else 0)
 
+    @inlineCallbacks
     def test_enable_disable_autoload(self):
-        self.test_enable_autoload(False)
+        yield self.test_enable_autoload(False)
