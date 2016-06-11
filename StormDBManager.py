@@ -199,7 +199,7 @@ class StormDBManager:
             questions = ','.join(('?',)*len(kwargs))
             sql = u'INSERT INTO %s %s VALUES (%s);' % (table_name, tuple(kwargs.keys()), questions)
 
-            self.connection.execute(sql, kwargs.values(), noresult=True)
+        connection.execute(sql, kwargs.values(), noresult=True)
 
     def insert_many(self, table_name, arg_list):
         """
@@ -218,8 +218,7 @@ class StormDBManager:
                 self.__insert(self.connection, table_name, **args)
             # connection.close()
 
-        return _insertmany(self, table_name, arg_list)
-        # return self.db_lock.run(_insertmany, self, table_name, arg_list)
+        return self.db_lock.run(_insertmany, self, table_name, arg_list)
 
     def delete(self, table_name, **kwargs):
         """
