@@ -1920,6 +1920,7 @@ class Community(TaskManager):
 
     @inlineCallbacks
     def _delay(self, match_info, delay, packet, candidate):
+        print "in _delay, community.py"
         assert len(match_info) == 4, match_info
         assert not match_info[0] or isinstance(match_info[0], unicode), type(match_info[0])
         assert not match_info[1] or isinstance(match_info[1], str), type(match_info[1])
@@ -1928,6 +1929,7 @@ class Community(TaskManager):
         assert not match_info[3] or isinstance(match_info[3], list), type(match_info[3])
 
         send_request = False
+        print 41
 
         # unwrap sequence number list
         seq_number_list = match_info[3] or [None]
@@ -1943,6 +1945,8 @@ class Community(TaskManager):
             self._delayed_value[delay].append(unwrapped_key)
 
         if send_request:
+            print 42
+            print delay
             yield delay.send_request(self, candidate)
             self._statistics.increase_delay_msg_count(u"send")
 
@@ -2025,6 +2029,7 @@ class Community(TaskManager):
         assert isinstance(cache, bool), cache
         assert isinstance(timestamp, float), timestamp
 
+        print "in on_incoming_packets, community.py"
         self._logger.debug("got %d incoming packets", len(packets))
 
         for _, iterator in groupby(packets, key=lambda tup: (tup[1][1], tup[1][22])):
@@ -2037,16 +2042,20 @@ class Community(TaskManager):
                 batch = [(self.get_candidate(candidate.sock_addr) or candidate, packet, conversion, source)
                          for candidate, packet in cur_packets]
                 if meta.batch.enabled and cache:
+                    print 1
                     if meta in self._batch_cache:
+                        print 2
                         _, current_batch = self._batch_cache[meta]
                         current_batch.extend(batch)
                         self._logger.debug("adding %d %s messages to existing cache", len(batch), meta.name)
                     else:
+                        print 3
                         self.register_task(meta, reactor.callLater(meta.batch.max_window, self._process_message_batch, meta))
                         self._batch_cache[meta] = (timestamp, batch)
                         self._logger.debug("new cache with %d %s messages (batch window: %d)",
                                            len(batch), meta.name, meta.batch.max_window)
                 else:
+                    print 4
                     yield self._on_batch_cache(meta, batch)
 
                 self._statistics.increase_total_received_count(len(cur_packets))
@@ -2094,6 +2103,7 @@ class Community(TaskManager):
          3. All remaining messages are passed to on_message_batch.
         """
         # convert binary packets into Message.Implementation instances
+        print "in _on_batch_cache, community.py"
         messages = []
 
         assert isinstance(batch, (list, set))
@@ -2102,17 +2112,24 @@ class Community(TaskManager):
         assert all(len(x) == 4 for x in batch)
 
         for candidate, packet, conversion, source in batch:
+            print 11
             assert isinstance(candidate, Candidate)
             assert isinstance(packet, str)
             assert isinstance(conversion, Conversion)
+
             try:
                 # convert binary data to internal Message
-                messages.append(conversion.decode_message(candidate, packet, source=source))
+                # TODO(laurens_ place back in append
+                bla = conversion.decode_message(candidate, packet, source=source)
+                print bla
+                messages.append(bla)
 
             except DropPacket as drop:
+                print 12
                 self._drop(drop, packet, candidate)
 
             except DelayPacket as delay:
+                print 13
                 yield self._dispersy._delay(delay, packet, candidate)
 
         assert all(isinstance(message, Message.Implementation) for message in messages), "convert_batch_into_messages must return only Message.Implementation instances"
@@ -2120,7 +2137,9 @@ class Community(TaskManager):
 
         # handle the incoming messages
         if messages:
+            print 14
             yield self.on_messages(messages)
+        print 15
 
     def purge_batch_cache(self):
         """
@@ -2193,6 +2212,8 @@ class Community(TaskManager):
         # TODO(emilon): This seems iffy
         assert len(messages) > 0  # should return at least one item for each message
         assert all(isinstance(message, (Message.Implementation, DropMessage, DelayMessage)) for message in messages)
+
+        print " HIERRR?"
 
         # handle/remove DropMessage and DelayMessage instances
         messages = []
@@ -2735,7 +2756,8 @@ class Community(TaskManager):
 
                     # verify that the bloom filter is correct
                     try:
-                        _, packets = yield self._get_packets_for_bloomfilters([[None, time_low, self.global_time if time_high == 0 else time_high, offset, modulo]], include_inactive=True).next()
+                        packets = yield self._get_packets_for_bloomfilters([[None, time_low, self.global_time if time_high == 0 else time_high, offset, modulo]], include_inactive=True)
+                        _, packets = packets.next()
                         packets = [packet for packet, in packets]
 
                     except OverflowError:
@@ -3006,6 +3028,7 @@ class Community(TaskManager):
 
     @inlineCallbacks
     def create_missing_identity(self, candidate, dummy_member):
+        print "in create_missing_identity, commmunity.py"
         """
         Create a dispersy-missing-identity message.
 
