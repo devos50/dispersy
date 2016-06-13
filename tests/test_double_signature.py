@@ -1,6 +1,8 @@
 from time import sleep
 
+from nose.twistedtools import reactor
 from twisted.internet.defer import inlineCallbacks
+from twisted.internet.task import deferLater
 
 from .dispersytestclass import DispersyTestFunc
 
@@ -24,7 +26,7 @@ class TestDoubleSign(DispersyTestFunc):
         message = other.create_double_signed_text(node.my_pub_member, "Allow=True")
         yield other.call(other._community.create_signature_request, node.my_candidate, message, on_response, timeout=1.0)
 
-        sleep(1.5)
+        yield deferLater(reactor, 1.5, lambda: None)
 
         self.assertEqual(container["timeout"], 1)
 
@@ -61,7 +63,8 @@ class TestDoubleSign(DispersyTestFunc):
         yield node.call(node._community.create_signature_request, other.my_candidate, message, on_response, timeout=1.0)
 
         # OTHER receives the request
-        _, message = other.receive_message(names=[u"dispersy-signature-request"]).next()
+        received_message = yield other.receive_message(names=[u"dispersy-signature-request"])
+        _, message = received_message.next()
         submsg = message.payload.message
 
         second_signature_offset = len(submsg.packet) - other.my_member.signature_length
@@ -73,7 +76,7 @@ class TestDoubleSign(DispersyTestFunc):
         yield other.give_message(message, node)
         yield node.process_packets()
 
-        sleep(1.5)
+        yield deferLater(reactor, 1.5, lambda: None)
 
         self.assertEqual(container["response"], 1)
 
@@ -113,7 +116,8 @@ class TestDoubleSign(DispersyTestFunc):
         yield node.call(node._community.create_signature_request, other.my_candidate, message, on_response, timeout=1.0)
 
         # OTHER receives the request
-        _, message = other.receive_message(names=[u"dispersy-signature-request"]).next()
+        received_message = yield other.receive_message(names=[u"dispersy-signature-request"])
+        _, message = received_message.next()
         submsg = message.payload.message
 
         second_signature_offset = len(submsg.packet) - other.my_member.signature_length
@@ -125,7 +129,7 @@ class TestDoubleSign(DispersyTestFunc):
         yield other.give_message(message, node)
         yield node.process_packets()
 
-        sleep(1.5)
+        yield deferLater(reactor, 1.5, lambda: None)
 
         self.assertEqual(container["response"], 1)
 
@@ -164,7 +168,8 @@ class TestDoubleSign(DispersyTestFunc):
         yield node.call(node._community.create_signature_request, other.my_candidate, message, on_response, timeout=1.0)
 
         # OTHER receives the request
-        _, message = other.receive_message(names=[u"dispersy-signature-request"]).next()
+        received_message = yield other.receive_message(names=[u"dispersy-signature-request"])
+        _, message = received_message.next()
         submsg = message.payload.message
 
         second_signature_offset = len(submsg.packet) - other.my_member.signature_length
@@ -176,6 +181,6 @@ class TestDoubleSign(DispersyTestFunc):
         yield other.give_message(message, node)
         yield node.process_packets()
 
-        sleep(1.5)
+        yield deferLater(reactor, 1.5, lambda: None)
 
         self.assertEqual(container["response"], 1)

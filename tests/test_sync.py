@@ -184,7 +184,8 @@ class TestSync(DispersyTestFunc):
         node.assert_not_stored(old_message)
 
         # as proof for the drop, the newest message should be sent back
-        _, message = other.receive_message(names=[u"last-1-test"]).next()
+        received_message = yield other.receive_message(names=[u"last-1-test"])
+        _, message = received_message.next()
         self.assertEqual(message.distribution.global_time, new_message.distribution.global_time)
 
     @inlineCallbacks
@@ -263,7 +264,8 @@ class TestSync(DispersyTestFunc):
             assert destination_mid_pre == destination._community.my_member.mid
 
             yield destination.give_message(origin.create_signature_request(12345, submsg, global_time), origin)
-            _, message = origin.receive_message(names=[u"dispersy-signature-response"]).next()
+            received_message = yield origin.receive_message(names=[u"dispersy-signature-response"])
+            _, message = received_message.next()
             returnValue((global_time, message.payload.message))
 
         @inlineCallbacks
@@ -354,7 +356,8 @@ class TestSync(DispersyTestFunc):
 
         # as proof for the drop, the more recent messages should be sent back to nodeB
         times = []
-        for _, message in nodeB.receive_message(names=[u"last-1-doublemember-text"]):
+        received_messages = yield nodeB.receive_message(names=[u"last-1-doublemember-text"])
+        for _, message in received_messages:
             times.append(message.distribution.global_time)
 
         self.assertEqual(sorted(times), [global_time, other_global_time])

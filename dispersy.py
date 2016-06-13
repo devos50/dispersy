@@ -636,6 +636,7 @@ class Dispersy(TaskManager):
 
     @inlineCallbacks
     def get_community(self, cid, load=False, auto_load=True):
+        print "in get_community, dispersy.py"
         """
         Returns a community by its community id.
 
@@ -664,22 +665,27 @@ class Dispersy(TaskManager):
         assert isinstance(auto_load, bool)
 
         try:
-            returnValue(self._communities[cid])
+            print 31
+            community = self._communities[cid]
+            print community
+            returnValue(community)
 
         except KeyError:
+            print 32
             if load or auto_load:
                 try:
                     # have we joined this community
                     classification, auto_load_flag, master_public_key = self._database.stormdb.fetchone(u"SELECT community.classification, community.auto_load, member.public_key FROM community JOIN member ON member.id = community.master WHERE mid = ?",
                                                                                                (buffer(cid),))
-
                 except TypeError:
                     pass
 
                 else:
+                    print 33
                     if load or (auto_load and auto_load_flag):
-
+                        print 34
                         if classification in self._auto_load_communities:
+                            print 35
                             master = self.get_member(public_key=str(master_public_key)) if master_public_key else self.get_member(mid=cid)
                             cls, my_member, args, kargs = self._auto_load_communities[classification]
                             community = yield cls.init_community(self, master, my_member, *args, **kargs)
@@ -1502,6 +1508,7 @@ class Dispersy(TaskManager):
         3. In case 2 suceeded: Pass the packets to the community for further processing.
 
         """
+        print "in on_incoming_packets, dispewrsy.py"
         assert isinstance(packets, (tuple, list)), packets
         assert len(packets) > 0, packets
         assert all(isinstance(packet, tuple) for packet in packets), packets
@@ -1831,12 +1838,17 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
         result = True
         meta = messages[0].meta
+        print "in _forward, dispersy.py"
+        print meta.destination
         if isinstance(meta.destination, (CommunityDestination, CandidateDestination)):
+            print 51
             for message in messages:
+                print 52
                 # CandidateDestination.candidates may be empty
                 candidates = set(message.destination.candidates)
                 # CommunityDestination.node_count is allowed to be zero
                 if isinstance(meta.destination, CommunityDestination) and meta.destination.node_count > 0:
+                    print 53
                     max_candidates = meta.destination.node_count + len(candidates)
                     for candidate in meta.community.dispersy_yield_verified_candidates():
                         if len(candidates) < max_candidates:
@@ -1852,6 +1864,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
     @inlineCallbacks
     def _delay(self, delay, packet, candidate):
+        print "in_delay, dispersy.py"
         for key in delay.match_info:
             assert len(key) == 5, key
             assert isinstance(key[0], str), type(key[0])
@@ -1864,13 +1877,17 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
 
             try:
+                print 21
                 community = yield self.get_community(key[0], load=False, auto_load=False)
+                print "le community: %s " % community
                 yield community._delay(key[1:], delay, packet, candidate)
             except CommunityNotFoundException:
+                print 22
                 self._logger.error('Messages can only be delayed for loaded communities.')
 
     @inlineCallbacks
     def _send(self, candidates, messages):
+        print "in _send, dispersy.py"
         """
         Send a list of messages to a list of candidates. If no candidates are specified or endpoint reported
         a failure this method will return False.
@@ -1891,12 +1908,17 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
         messages_send = False
         if len(candidates) and len(messages):
+            print 61
             packets = [message.packet for message in messages]
             messages_send = yield self._endpoint.send(candidates, packets)
 
         if messages_send:
+            print 62
             for message in messages:
+                print 63
+                print message.meta.name
                 if message.meta.name == u"dispersy-introduction-request":
+                    print 64
                     for candidate in candidates:
                         message.community.statistics.msg_statistics.walk_attempt_count += 1
                         message.community.statistics.increase_msg_count(u"outgoing_intro", candidate.sock_addr)
@@ -1908,6 +1930,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                 message.community.statistics.increase_msg_count(
                     u"outgoing", message.meta.name, len(candidates))
 
+        print "messages sent: %s" % messages_send
         returnValue(messages_send)
 
     @inlineCallbacks

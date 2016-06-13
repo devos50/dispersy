@@ -69,7 +69,8 @@ class TestWalker(DispersyTestFunc):
         num_non_tunnelled_nodes = len([node for node in nodes if not node.tunnel])
 
         for node in nodes:
-            _, response = node.receive_message().next()
+            received_message = yield node.receive_message()
+            _, response = received_message.next()
 
             # MM must not introduce NODE to itself
             self.assertNotEquals(response.payload.lan_introduction_address, node.lan_address)

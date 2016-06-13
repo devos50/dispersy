@@ -273,11 +273,11 @@ class DiscoveryCommunity(Community):
                                            mm.destination, ExtendedIntroPayload(), mm.check_callback, mm.handle_callback)
 
         return meta_messages + [Message(self, u"similarity-request", MemberAuthentication(), PublicResolution(), DirectDistribution(),
-                                        CandidateDestination(), SimilarityRequestPayload(), self.check_similarity_request, self.on_similarity_request),
+                                        CandidateDestination(), SimilarityRequestPayload(), self.check_similarity_request, self.on_similarity_request), # TODO(Laurens): self.on_similarity_request returns a deferred, is that ok?
                                 Message(self, u"similarity-response", MemberAuthentication(), PublicResolution(), DirectDistribution(),
                                         CandidateDestination(), SimilarityResponsePayload(), self.check_similarity_response, self.on_similarity_response),
                                 Message(self, u"ping", NoAuthentication(), PublicResolution(), DirectDistribution(), CandidateDestination(),
-                                        PingPayload(), self._generic_timeline_check, self.on_ping),
+                                        PingPayload(), self._generic_timeline_check, self.on_ping), # TODO(Laurens) self.on_ping returns a deferred now.
                                 Message(self, u"pong", NoAuthentication(), PublicResolution(), DirectDistribution(), CandidateDestination(),
                                         PongPayload(), self.check_pong, self.on_pong)]
 
@@ -537,6 +537,7 @@ class DiscoveryCommunity(Community):
 
             yield message
 
+    @inlineCallbacks
     def on_similarity_request(self, messages):
         meta = self.get_meta_message(u"similarity-response")
 
@@ -583,7 +584,7 @@ class DiscoveryCommunity(Community):
             self._logger.debug("DiscoveryCommunity: sending similarity response to %s containing %s",
                                message.candidate, [preference.encode('HEX') for preference in payload[1]])
 
-            self._dispersy._send([message.candidate], [response_message])
+            yield self._dispersy._send([message.candidate], [response_message])
 
     def compute_overlap(self, his_prefs, my_prefs=None):
         return len(set(his_prefs) & set(my_prefs or self.my_preferences()))
@@ -701,16 +702,18 @@ class DiscoveryCommunity(Community):
             self._logger.debug("DiscoveryCommunity: no response on ping, removing from taste_buddies %s", self.requested_candidate)
             self.community.remove_taste_buddy(self.requested_candidate)
 
+    @inlineCallbacks
     def create_ping_requests(self):
         tbs = list(self.yield_taste_buddies())[:self.max_tbs]
         for tb in tbs:
             if tb.time_remaining() < PING_INTERVAL:
                 cache = self._request_cache.add(DiscoveryCommunity.PingRequestCache(self, tb.candidate))
-                self._create_pingpong(u"ping", tb.candidate, cache.number)
+                yield self._create_pingpong(u"ping", tb.candidate, cache.number)
 
+    @inlineCallbacks
     def on_ping(self, messages):
         for message in messages:
-            self._create_pingpong(u"pong", message.candidate, message.payload.identifier)
+            yield self._create_pingpong(u"pong", message.candidate, message.payload.identifier)
 
             self._logger.debug("DiscoveryCommunity: got ping from %s", message.candidate)
             self.reset_taste_buddy(message.candidate)
@@ -739,10 +742,11 @@ class DiscoveryCommunity(Community):
 
             self.reset_taste_buddy(message.candidate)
 
+    @inlineCallbacks
     def _create_pingpong(self, meta_name, candidate, identifier):
         meta = self.get_meta_message(meta_name)
         message = meta.impl(distribution=(self.global_time,), payload=(identifier,))
-        self._dispersy._send([candidate, ], [message])
+        yield self._dispersy._send([candidate, ], [message])
 
         self._logger.debug("DiscoveryCommunity: send %s to %s",
                            meta_name, str(candidate))

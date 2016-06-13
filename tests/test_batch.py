@@ -1,6 +1,8 @@
 from time import time, sleep
 
+from nose.twistedtools import reactor
 from twisted.internet.defer import inlineCallbacks
+from twisted.internet.task import deferLater
 
 from .dispersytestclass import DispersyTestFunc
 
@@ -12,18 +14,27 @@ class TestBatch(DispersyTestFunc):
         self._big_batch_took = 0.0
         self._small_batches_took = 0.0
 
+    def test_bla(self):
+        self.create_nodes()
+
     @inlineCallbacks
     def test_one_batch(self):
+        print "here %s" % 1
         node, other = self.create_nodes(2)
+        print "here %s" % 4
         yield other.send_identity(node)
+
+        print "here %s" % 2
 
         messages = [node.create_batched_text("duplicates", i + 10) for i in range(10)]
         yield other.give_messages(messages, node, cache=True)
 
+        print "here %s" % 3
+
         # no messages may be in the database, as they need to be batched
         other.assert_count(messages[0], 0)
 
-        sleep(messages[0].meta.batch.max_window + 1.0)
+        yield deferLater(reactor, messages[0].meta.batch.max_window + 1.0, lambda: None)
 
         # all of the messages must be stored in the database, as batch_window expired
         other.assert_count(messages[0], 10)
@@ -40,7 +51,7 @@ class TestBatch(DispersyTestFunc):
             # no messages may be in the database, as they need to be batched
             other.assert_count(message, 0)
 
-        sleep(messages[0].meta.batch.max_window + 1.0)
+        yield deferLater(reactor, messages[0].meta.batch.max_window + 1.0, lambda: None)
 
         # all of the messages must be stored in the database, as batch_window expired
         other.assert_count(messages[0], 10)

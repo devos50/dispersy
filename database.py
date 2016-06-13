@@ -258,7 +258,7 @@ class Database(object):
             # returning False to let Python reraise the exception.
             return False
 
-    @attach_explain_query_plan
+    # @attach_explain_query_plan
     @attach_runtime_statistics(u"{0.__class__.__name__}.{function_name} {1} [{0.file_path}]")
     def execute(self, statement, bindings=(), get_lastrowid=False):
         """
@@ -317,7 +317,7 @@ class Database(object):
         self._logger.log(logging.NOTSET, "%s [%s]", statements, self._file_path)
         return self._cursor.executescript(statements)
 
-    @attach_explain_query_plan
+    # @attach_explain_query_plan
     @attach_runtime_statistics(u"{0.__class__.__name__}.{function_name} {1} [{0.file_path}]")
     def executemany(self, statement, sequenceofbindings):
         """

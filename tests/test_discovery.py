@@ -1,4 +1,6 @@
+from nose.twistedtools import reactor
 from twisted.internet.defer import inlineCallbacks
+from twisted.internet.task import deferLater
 
 from .dispersytestclass import DispersyTestFunc
 from ..discovery.community import DiscoveryCommunity
@@ -24,7 +26,7 @@ class TestDiscovery(DispersyTestFunc):
 
         yield node.process_packets()
         yield self._mm.process_packets()
-        time.sleep(1)
+        yield deferLater(reactor, 1, lambda: None)
 
         assert node._community.is_taste_buddy_mid(self._mm.my_mid)
         assert self._mm._community.is_taste_buddy_mid(node.my_mid)
@@ -49,7 +51,7 @@ class TestDiscovery(DispersyTestFunc):
 
         yield node.process_packets()
         yield self._mm.process_packets()
-        time.sleep(1)
+        yield deferLater(reactor, 1, lambda: None)
 
         assert node._community.is_taste_buddy_mid(self._mm.my_mid)
         assert self._mm._community.is_taste_buddy_mid(node.my_mid)
@@ -65,7 +67,7 @@ class TestDiscovery(DispersyTestFunc):
 
         yield self._mm.process_packets()
         yield other.process_packets()
-        time.sleep(1)
+        yield deferLater(reactor, 1, lambda: None)
 
         # other and mm should not be taste buddies
         assert not other._community.is_taste_buddy_mid(self._mm.my_mid)

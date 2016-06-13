@@ -84,6 +84,8 @@ class Conversion(object):
         assert isinstance(data, str), type(data)
         assert len(data) >= 23
 
+        print "prefix match: %s vs %s" % (data[:22], self._prefix)
+
         return (len(data) >= 23 and data[:22] == self._prefix)
 
     @abstractmethod
@@ -1073,7 +1075,9 @@ class NoDefBinaryConversion(Conversion):
             member_id = data[offset:offset + 20]
             offset += 20
 
+            print " MEMBER_ID: %s" % member_id
             member = self._community.get_member(mid=member_id)
+            print "MEMBER (_decode_member_authentication): %s" % member
             # If signatures and verification are enabled, verify that the signature matches the member sha1 identifier
             if member:
                 placeholder.offset = offset
@@ -1159,6 +1163,10 @@ class NoDefBinaryConversion(Conversion):
         Returns True when DATA can be decoded using this conversion.
         """
         assert isinstance(data, str), type(data)
+        print "here1337"
+        print (len(data) >= 23 and
+                data[:22] == self._prefix and
+                data[22] in self._decode_message_map)
         return (len(data) >= 23 and
                 data[:22] == self._prefix and
                 data[22] in self._decode_message_map)
@@ -1190,29 +1198,47 @@ class NoDefBinaryConversion(Conversion):
         assert isinstance(verify, bool)
         assert isinstance(allow_empty_signature, bool)
 
+        print 101
+
         if not self.can_decode_message(data):
             raise DropPacket("Cannot decode message")
 
         decode_functions = self._decode_message_map[data[22]]
 
+        print 102
+
+        print (candidate, decode_functions.meta, 23, data, verify, allow_empty_signature)
         # placeholder
         placeholder = self.Placeholder(candidate, decode_functions.meta, 23, data, verify, allow_empty_signature)
 
+        print 103
+
         # authentication
+        print decode_functions.authentication
         decode_functions.authentication(placeholder)
+
+        print "in between"
         assert isinstance(placeholder.authentication, Authentication.Implementation), placeholder.authentication
+
+        print 104
 
         # resolution
         decode_functions.resolution(placeholder)
         assert isinstance(placeholder.resolution, Resolution.Implementation)
 
+        print 105
+
         # destination
         decode_functions.destination(placeholder)
         assert isinstance(placeholder.destination, Destination.Implementation)
 
+        print 106
+
         # distribution
         decode_functions.distribution(placeholder)
         assert isinstance(placeholder.distribution, Distribution.Implementation)
+
+        print 107
 
         # payload
         payload = placeholder.data[:placeholder.first_signature_offset]
@@ -1225,9 +1251,13 @@ class NoDefBinaryConversion(Conversion):
         assert isinstance(placeholder.payload, Payload.Implementation), type(placeholder.payload)
         assert isinstance(placeholder.offset, (int, long))
 
+
+
         # verify payload
         if placeholder.verify and not placeholder.authentication.has_valid_signature_for(placeholder, payload):
+
             raise DropPacket("Invalid signature")
+
 
         return placeholder.meta.Implementation(placeholder.meta, placeholder.authentication, placeholder.resolution, placeholder.distribution, placeholder.destination, placeholder.payload, conversion=self, candidate=candidate, source=source, packet=placeholder.data)
 

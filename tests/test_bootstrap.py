@@ -74,7 +74,7 @@ class TestBootstrapServers(DispersyTestFunc):
 
         # can take a few seconds to start on older machines (or when running on a remote file
         # system)
-        sleep(5)
+        yield deferLater(reactor, 5, lambda: None)
 
         try:
             class Community(DebugCommunity):
@@ -102,15 +102,17 @@ class TestBootstrapServers(DispersyTestFunc):
                               destination)
 
             # node receives missing identity
-            _, message = node.receive_message(names=[u"dispersy-missing-identity"]).next()
+            # TODO(Laurens): can you call a .next on this?
+            received_messsage = yield node.receive_message(names=[u"dispersy-missing-identity"])
+            _, message = received_messsage.next()
             self.assertEqual(message.payload.mid, node.my_member.mid)
 
             packet = yield node.fetch_packets([u"dispersy-identity", ], node.my_member.mid)[0]
             yield node.send_packet(packet, destination)
 
             yield node.process_packets()
-
-            _, message = node.receive_message(names=[u"dispersy-identity"]).next()
+            received_messsage = yield node.receive_message(names=[u"dispersy-identity"])
+            _, message = received_messsage.next()
 
         finally:
             self._logger.debug("terminate tracker")
@@ -396,8 +398,8 @@ class TestBootstrapServers(DispersyTestFunc):
                 for member in members:
                     yield community.prepare_ping(member)
 
-            sleep(5)
-        sleep(15)
+                    yield deferLater(reactor, 5, lambda: None)
+                yield deferLater(reactor, 5, lambda: None)
 
         self._logger.info("ping-ping")
         BEGIN = time()
@@ -405,13 +407,13 @@ class TestBootstrapServers(DispersyTestFunc):
             for community in communities:
                 for _ in xrange(MEMBERS / 100):
                     yield community.ping_from_queue(100)
-                    sleep(0.1)
+                    yield deferLater(reactor, 0.1, lambda: None)
 
             for community in communities:
                 community.summary()
         END = time()
 
-        sleep(10)
+        yield deferLater(reactor, 10, lambda: None)
         self._logger.info("--- did %d requests per community", ROUNDS * MEMBERS)
         self._logger.info("--- spread over %.2f seconds", END - BEGIN)
         for community in communities:

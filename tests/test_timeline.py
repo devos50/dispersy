@@ -60,7 +60,8 @@ class TestTimeline(DispersyTestFunc):
         yield node.give_message(other.create_missing_proof(node.my_member, 42), other)
 
         # NODE sends dispersy-authorize to OTHER
-        _, authorize = other.receive_message(names=[u"dispersy-authorize"]).next()
+        received_message = yield other.receive_message(names=[u"dispersy-authorize"])
+        _, authorize = received_message.next()
 
         permission_triplet = (node.my_member.mid, u"protected-full-sync-text", u"permit")
         authorize_permission_triplets = [(triplet[0].mid, triplet[1].name, triplet[2]) for triplet in authorize.payload.permission_triplets]
@@ -92,7 +93,8 @@ class TestTimeline(DispersyTestFunc):
         yield node.give_message(other.create_missing_proof(authorize.authentication.member, authorize.distribution.global_time), other)
 
         # NODE sends dispersy-authorize containing authorize(MASTER, OWNER) to OTHER
-        _, authorize = other.receive_message(names=[u"dispersy-authorize"]).next()
+        received_message = yield other.receive_message(names=[u"dispersy-authorize"])
+        _, authorize = received_message.next()
 
         permission_triplet = (self._mm.my_member.mid, u"protected-full-sync-text", u"permit")
         authorize_permission_triplets = [(triplet[0].mid, triplet[1].name, triplet[2]) for triplet in authorize.payload.permission_triplets]

@@ -1,5 +1,5 @@
 import sys
-from time import time, sleep
+from time import time
 import logging
 
 from twisted.internet import reactor
@@ -130,6 +130,7 @@ class DebugNode(object):
 
             # download mm identity, mm authorizing central_node._my_member
             packets = yield self._central_node.fetch_packets([u"dispersy-identity", u"dispersy-authorize"], self._community.master_member.mid)
+            print "packets %s" % packets
             yield self.give_packets(packets, self._central_node)
 
             # add this node to candidate list of mm
@@ -158,12 +159,15 @@ class DebugNode(object):
         Give multiple PACKETS directly to Dispersy on_incoming_packets.
         Returns PACKETS
         """
+        print "in give_packets, node.py"
         assert isinstance(packets, list), type(packets)
         assert all(isinstance(packet, str) for packet in packets), [type(packet) for packet in packets]
         assert isinstance(source, DebugNode), type(source)
         assert isinstance(cache, bool), type(cache)
+        print "KOEK"
 
         self._logger.debug("%s giving %d bytes", self.my_candidate, sum(len(packet) for packet in packets))
+        print self._dispersy.endpoint
         yield self._dispersy.endpoint.process_packets([(source.lan_address, TUNNEL_PREFIX + packet if source.tunnel else packet) for packet in packets], cache=cache)
 
     @inlineCallbacks
@@ -183,7 +187,9 @@ class DebugNode(object):
         packets = [message.packet if message.packet else self.encode_message(message) for message in messages]
         self._logger.debug("%s giving %d messages (%d bytes)",
                            self.my_candidate, len(messages), sum(len(packet) for packet in packets))
+        print "in give_messages before give_packets"
         yield self.give_packets(packets, source, cache=cache)
+        print "messages delivered to node!"
 
     @inlineCallbacks
     def send_packet(self, packet, candidate):
@@ -217,13 +223,15 @@ class DebugNode(object):
         """
         Process all packets on the nodes' socket.
         """
+        print "in process-packets, node.py"
         timeout = time() + timeout
         while timeout > time():
             packets = yield self._dispersy.endpoint.process_receive_queue()
+            print " I have le receive packets: %s" % packets
             if packets:
                 returnValue(packets)
             else:
-                sleep(0.1)
+                yield deferLater(reactor, 0.1, lambda: None)
 
     def drop_packets(self):
         """
@@ -232,6 +240,7 @@ class DebugNode(object):
         for address, packet in self._dispersy.endpoint.clear_receive_queue():
             self._logger.debug("dropped %d bytes from %s:%d", len(packet), address[0], address[1])
 
+    @inlineCallbacks
     def receive_packet(self, addresses=None, timeout=0.5):
         """
         Returns the first matching (candidate, packet) tuple from incoming UDP packets.
@@ -262,11 +271,14 @@ class DebugNode(object):
                     self._logger.debug("%d bytes from %s", len(packet), candidate)
                     yield candidate, packet
             else:
-                sleep(0.001)
+                yield deferLater(reactor, 0.001, lambda: None)
 
+    @inlineCallbacks
     def receive_packets(self, addresses=None, timeout=0.5):
-        return list(self.receive_packet(addresses, timeout))
+        packets = yield self.receive_packet(addresses, timeout)
+        returnValue(list(packets))
 
+    @inlineCallbacks
     def receive_message(self, addresses=None, names=None, timeout=0.5):
         """
         Returns the first matching (candidate, message) tuple from incoming UDP packets.
@@ -282,31 +294,37 @@ class DebugNode(object):
         assert names is None or isinstance(names, list), type(names)
         assert names is None or all(isinstance(name, unicode) for name in names), [type(name) for name in names]
 
-        for candidate, packet in self.receive_packet(addresses, timeout):
-            try:
-                message = self.decode_message(candidate, packet)
-            except ConversionNotFoundException as exception:
-                self._logger.exception("Ignored %s", exception)
-                continue
+        packets = yield self.receive_packet(addresses, timeout)
+        print "in node.py, receive_messages"
+        print "node.py, receive_messages: %s" % packets
+        if packets:
+            for candidate, packet in packets:
+                try:
+                    message = self.decode_message(candidate, packet)
+                except ConversionNotFoundException as exception:
+                    self._logger.exception("Ignored %s", exception)
+                    continue
 
-            if not (names is None or message.name in names):
-                self._logger.debug("Ignored %s (%d bytes) from %s", message.name, len(packet), candidate)
-                continue
+                if not (names is None or message.name in names):
+                    self._logger.debug("Ignored %s (%d bytes) from %s", message.name, len(packet), candidate)
+                    continue
 
-            self._logger.debug("%s (%d bytes) from %s", message.name, len(packet), candidate)
-            yield candidate, message
+                self._logger.debug("%s (%d bytes) from %s", message.name, len(packet), candidate)
+                yield candidate, message
 
     @blocking_call_on_reactor_thread
     @inlineCallbacks
     def receive_messages(self, addresses=None, names=None, return_after=sys.maxint, timeout=0.5):
         messages = []
         for _ in xrange(5):
-            for message_tuple in self.receive_message(addresses, names, timeout):
-                messages.append(message_tuple)
-                if len(messages) == return_after:
+            received_messages = yield self.receive_message(addresses, names, timeout)
+            if received_messages:
+                for message_tuple in received_messages:
+                    messages.append(message_tuple)
+                    if len(messages) == return_after:
+                        break
+                if messages:
                     break
-            if messages:
-                break
             else:
                 # Wait for a bit and try again
                 yield deferLater(reactor, 0.005, lambda : None)
@@ -537,6 +555,7 @@ class DebugNode(object):
         """
         Returns a new dispersy-missing-identity message.
         """
+        print "in create_missing_identity, node.py"
         assert isinstance(dummy_member, Member), type(dummy_member)
         meta = self._community.get_meta_message(u"dispersy-missing-identity")
 

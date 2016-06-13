@@ -114,7 +114,8 @@ class TestUndo(DispersyTestFunc):
         # the second one (its "higher" than the one just received)
         undo_packets = []
 
-        for candidate, b in node.receive_packets():
+        received_packets = yield node.receive_packets()
+        for candidate, b in received_packets:
             self._logger.debug(candidate)
             self._logger.debug(type(b))
             self._logger.debug("%d", len(b))

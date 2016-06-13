@@ -155,7 +155,8 @@ class TestDynamicSettings(DispersyTestFunc):
         tmessage = node.create_dynamic_resolution_text("Message #%d" % 25, public.implement(), 25)
         yield other.give_message(tmessage, node)
 
-        _, message = node.receive_message(names=[u"dispersy-missing-proof"]).next()
+        received_message = yield node.receive_message(names=[u"dispersy-missing-proof"])
+        _, message = received_message.next()
         yield other.give_message(policy_public, self._mm)
         other.assert_is_done(tmessage)
 
@@ -195,5 +196,6 @@ class TestDynamicSettings(DispersyTestFunc):
         tmessage = node.create_dynamic_resolution_text("Message #%d" % 12, public.implement(), 12)
         yield other.give_message(tmessage, node)
 
-        _, message = node.receive_message(names=[u"dispersy-dynamic-settings"]).next()
+        received_message = yield node.receive_message(names=[u"dispersy-dynamic-settings"])
+        _, message = received_message.next()
         assert message

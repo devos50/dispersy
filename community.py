@@ -1871,23 +1871,35 @@ class Community(TaskManager):
         assert not public_key or self._dispersy.crypto.is_valid_public_bin(public_key)
         assert not private_key or self._dispersy.crypto.is_valid_private_bin(private_key)
 
+        print "=-=-=-=-=-=-=-=-=-= get_member in community .py =-=-=-=-=-=-=-=-=-="
+        print "mid: %s" % mid
+        print "public_key: %s" % public_key
+        print "private key: %s" % private_key
+
         member = self._dispersy.get_member(mid=mid, public_key=public_key, private_key=private_key)
         # We only need to check if this member has an identity message in this community if we still don't have the full
         # public key
         if not mid:
+            print 111
             return member
         if isinstance(member, Member):
+            print 112
             has_identity = member.has_identity(self)
             if not has_identity:
+                print 113
                 # check database and update identity set if found
                 sync_packet = self._dispersy.database.stormdb.fetchone(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ? LIMIT 1",
                     (member.database_id, self.get_meta_message(u"dispersy-identity").database_id))
 
-                if sync_packet:
+                if sync_packet is not None:
+                    print 114
                     member.add_identity(self)
                     has_identity = True
             if has_identity:
+                print 115
                 return member
+        print 116
+        print "=-=-=-=-=-=-=-=-=-= get_member in community .py =-=-=-=-=-=-=-=-=-="
 
     @inlineCallbacks
     def _generic_timeline_check(self, messages):
@@ -2103,7 +2115,6 @@ class Community(TaskManager):
          3. All remaining messages are passed to on_message_batch.
         """
         # convert binary packets into Message.Implementation instances
-        print "in _on_batch_cache, community.py"
         messages = []
 
         assert isinstance(batch, (list, set))
@@ -2121,7 +2132,7 @@ class Community(TaskManager):
                 # convert binary data to internal Message
                 # TODO(laurens_ place back in append
                 bla = conversion.decode_message(candidate, packet, source=source)
-                print bla
+                print 16
                 messages.append(bla)
 
             except DropPacket as drop:
