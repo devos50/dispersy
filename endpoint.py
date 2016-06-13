@@ -129,6 +129,8 @@ class StandaloneEndpoint(Endpoint):
     def open(self, dispersy):
         super(StandaloneEndpoint, self).open(dispersy)
 
+        print "in open, endpoint.py"
+
         for _ in xrange(10000):
             try:
                 self._logger.debug("Listening at %d", self._port)
@@ -233,6 +235,7 @@ class StandaloneEndpoint(Endpoint):
                 for sock_addr, data in normal_packets:
                     yield self.log_packet(sock_addr, data, outbound=False)
 
+            print "kuku"
             # The endpoint runs on it's own thread, so we can't do a callLater here
             reactor.callFromThread(self.dispersythread_data_came_in, normal_packets, time(), cache)
 
@@ -240,12 +243,16 @@ class StandaloneEndpoint(Endpoint):
     def dispersythread_data_came_in(self, packets, timestamp, cache=True):
         assert self._dispersy, "Should not be called before open(...)"
 
+        print "zz %s" % 1
+
         def strip_if_tunnel(packets):
             for sock_addr, data in packets:
                 if data.startswith(TUNNEL_PREFIX):
                     yield True, sock_addr, data[TUNNEL_PREFIX_LENGHT:]
                 else:
                     yield False, sock_addr, data
+
+        print  "ZOOF"
 
         yield self._dispersy.on_incoming_packets([(Candidate(sock_addr, tunnel), data)
                                             for tunnel, sock_addr, data
@@ -256,6 +263,7 @@ class StandaloneEndpoint(Endpoint):
 
     @inlineCallbacks
     def send(self, candidates, packets, prefix=None):
+        print "in send, standaloneendpoint"
         assert self._dispersy, "Should not be called before open(...)"
         assert isinstance(candidates, (tuple, list, set)), type(candidates)
         assert all(isinstance(candidate, Candidate) for candidate in candidates), [type(candidate) for candidate in candidates]
@@ -271,14 +279,17 @@ class StandaloneEndpoint(Endpoint):
 
         send_packet = False
         for candidate, packet in product(candidates, packets):
+            print 71
             send_packet_result = yield self.send_packet(candidate, packet)
             if send_packet_result:
+                print 72
                 send_packet = True
 
         returnValue(send_packet)
 
     @inlineCallbacks
     def send_packet(self, candidate, packet, prefix=None):
+        print "in send_packet, standaloneendpoint"
         assert self._dispersy, "Should not be called before open(...)"
         assert isinstance(candidate, Candidate), type(candidate)
         assert isinstance(packet, str), type(packet)
@@ -295,20 +306,27 @@ class StandaloneEndpoint(Endpoint):
         data = TUNNEL_PREFIX + packet if candidate.tunnel else packet
 
         try:
+            print 81
+            print candidate.sock_addr
+            print self._socket
             self._socket.sendto(data, candidate.sock_addr)
 
             if self._logger.isEnabledFor(logging.DEBUG):
+                print 82
                 yield self.log_packet(candidate.sock_addr, packet)
 
         except socket.error:
+            print 83
             with self._sendqueue_lock:
                 did_have_senqueue = bool(self._sendqueue)
                 self._sendqueue.append((time(), candidate.sock_addr, data))
 
             # If we did not have a sendqueue, then we need to call process_sendqueue in order send these messages
             if not did_have_senqueue:
+                print 84
                 yield self._process_sendqueue()
 
+        print 85
         returnValue(True)
 
     @inlineCallbacks
@@ -383,5 +401,6 @@ class ManualEnpoint(StandaloneEndpoint):
 
     @inlineCallbacks
     def process_packets(self, packets, cache=True):
+        print "in process_packets, endpoint.py"
         self._logger.debug('processing %d packets', len(packets))
         yield StandaloneEndpoint.data_came_in(self, packets, cache=cache)
