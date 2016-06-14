@@ -80,7 +80,8 @@ class TestNeighborhood(DispersyTestFunc):
         # check if sufficient NODES received the message (at least the first `target_count` ones)
         forwarded_node_count = 0
         for node in nodes:
-            forwarded = [m for _, m in node.receive_messages(names=[u"full-sync-text"], timeout=0.1)]
+            messages = yield node.receive_messages(names=[u"full-sync-text"], timeout=0.1)
+            forwarded = [m for _, m in messages]
             if node in nodes[:targeted_node_count]:
                 # They MUST have received the message
                 self.assertEqual(len(forwarded), 1)

@@ -209,7 +209,8 @@ class TestPruning(DispersyTestFunc):
         yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42, global_time), node)
 
         # OTHER should return the 10 active messages
-        responses = [response for _, response in node.receive_messages(names=[u"full-sync-global-time-pruning-text"])]
+        messages = yield node.receive_messages(names=[u"full-sync-global-time-pruning-text"])
+        responses = [response for _, response in messages]
         self.assertEqual(len(responses), 10)
         self.assertTrue(all(message.packet == response.packet for message, response in zip(messages[10:20], responses)))
 
@@ -225,6 +226,7 @@ class TestPruning(DispersyTestFunc):
         yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42, global_time), node)
 
         # OTHER should return the 5 active pruning messages
-        responses = [response for _, response in node.receive_messages(names=[u"full-sync-global-time-pruning-text"])]
+        messages = yield node.receive_messages(names=[u"full-sync-global-time-pruning-text"])
+        responses = [response for _, response in messages]
         self.assertEqual(len(responses), 5)
         self.assertTrue(all(message.packet == response.packet for message, response in zip(messages[15:20], responses)))

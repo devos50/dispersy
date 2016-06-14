@@ -677,7 +677,7 @@ class Community(TaskManager):
     @property
     @inlineCallbacks
     def dispersy_sync_bloom_filter_strategy(self):
-        res = self._dispersy_claim_sync_bloom_filter_largest
+        res = yield self._dispersy_claim_sync_bloom_filter_largest
         returnValue(res)
 
     @property
@@ -2224,8 +2224,6 @@ class Community(TaskManager):
         assert len(messages) > 0  # should return at least one item for each message
         assert all(isinstance(message, (Message.Implementation, DropMessage, DelayMessage)) for message in messages)
 
-        print " HIERRR?"
-
         # handle/remove DropMessage and DelayMessage instances
         messages = []
         for message in messages:
@@ -2311,6 +2309,7 @@ class Community(TaskManager):
         """
         We received a dispersy-identity message.
         """
+        print "appeltaart: %s" % messages
         for message in messages:
             if message.authentication.member.mid == self._master_member.mid:
                 self._logger.debug("%s received master member", self._cid.encode("HEX"))
@@ -2767,8 +2766,8 @@ class Community(TaskManager):
 
                     # verify that the bloom filter is correct
                     try:
-                        packets = yield self._get_packets_for_bloomfilters([[None, time_low, self.global_time if time_high == 0 else time_high, offset, modulo]], include_inactive=True)
-                        _, packets = packets.next()
+                        bloomfilter_packets = yield self._get_packets_for_bloomfilters([[None, time_low, self.global_time if time_high == 0 else time_high, offset, modulo]], include_inactive=True)
+                        _, packets = bloomfilter_packets.next()
                         packets = [packet for packet, in packets]
 
                     except OverflowError:
@@ -3296,7 +3295,9 @@ class Community(TaskManager):
         @todo: We should raise a DelayMessageByProof to ensure that we request the proof for this
          message immediately.
         """
+
         for message in messages:
+            print "kersentaart: %s %s" % (message.authentication.member, message.authentication.member.public_key)
             self.timeline.authorize(message.authentication.member, message.distribution.global_time, message.payload.permission_triplets, message)
 
     @inlineCallbacks

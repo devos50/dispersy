@@ -171,7 +171,8 @@ class TestUndo(DispersyTestFunc):
         global_times = [message.distribution.global_time for message in messages]
         global_time_requests = []
 
-        for _, message in node.receive_messages(names=[u"dispersy-missing-message"]):
+        messages = yield node.receive_messages(names=[u"dispersy-missing-message"])
+        for _, message in messages:
             self.assertEqual(message.payload.member.public_key, node.my_member.public_key)
             global_time_requests.extend(message.payload.global_times)
 

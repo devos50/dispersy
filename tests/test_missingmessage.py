@@ -27,7 +27,8 @@ class TestMissingMessage(DispersyTestFunc):
             yield node.give_message(missing_message, other)
 
             # receive response
-            responses = [response for _, response in other.receive_messages(names=[message.name])]
+            messages = yield other.receive_messages(names=[message.name])
+            responses = [response for _, response in messages]
             self.assertEqual(sorted(response.distribution.global_time for response in responses), global_times)
 
     @inlineCallbacks

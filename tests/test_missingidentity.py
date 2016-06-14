@@ -17,7 +17,7 @@ class TestMissingIdentity(DispersyTestFunc):
         yield other.give_message(node.create_missing_identity(other.my_member, 10), node)
 
         # MISSING should reply with a dispersy-identity message
-        responses = node.receive_messages()
+        responses = yield node.receive_messages()
 
         self.assertEqual(len(responses), 1)
         for _, response in responses:
@@ -39,7 +39,7 @@ class TestMissingIdentity(DispersyTestFunc):
         other.assert_not_stored(message)
 
         # OTHER must send a missing-identity to NODEs
-        responses = node.receive_messages()
+        responses = yield node.receive_messages()
         self.assertEqual(len(responses), 1)
         for _, response in responses:
             self.assertEqual(response.name, u"dispersy-missing-identity")
@@ -69,7 +69,7 @@ class TestMissingIdentity(DispersyTestFunc):
         yield other.give_message(message, node)
 
         # OTHER must send a single missing-identity to NODE
-        responses = node.receive_messages()
+        responses = yield node.receive_messages()
         self.assertEqual(len(responses), 1)
         for _, response in responses:
             self.assertEqual(response.name, u"dispersy-missing-identity")

@@ -27,7 +27,7 @@ class TestTimeline(DispersyTestFunc):
         other.assert_not_stored(tmessage)
 
         # OTHER sends dispersy-missing-proof to NODE
-        responses = node.receive_messages()
+        responses = yield node.receive_messages()
         self.assertEqual(len(responses), 1)
         for _, message in responses:
             self.assertEqual(message.name, u"dispersy-missing-proof")

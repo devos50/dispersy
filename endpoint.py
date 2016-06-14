@@ -235,7 +235,6 @@ class StandaloneEndpoint(Endpoint):
                 for sock_addr, data in normal_packets:
                     yield self.log_packet(sock_addr, data, outbound=False)
 
-            print "kuku"
             # The endpoint runs on it's own thread, so we can't do a callLater here
             reactor.callFromThread(self.dispersythread_data_came_in, normal_packets, time(), cache)
 
@@ -243,16 +242,12 @@ class StandaloneEndpoint(Endpoint):
     def dispersythread_data_came_in(self, packets, timestamp, cache=True):
         assert self._dispersy, "Should not be called before open(...)"
 
-        print "zz %s" % 1
-
         def strip_if_tunnel(packets):
             for sock_addr, data in packets:
                 if data.startswith(TUNNEL_PREFIX):
                     yield True, sock_addr, data[TUNNEL_PREFIX_LENGHT:]
                 else:
                     yield False, sock_addr, data
-
-        print  "ZOOF"
 
         yield self._dispersy.on_incoming_packets([(Candidate(sock_addr, tunnel), data)
                                             for tunnel, sock_addr, data
@@ -326,7 +321,7 @@ class StandaloneEndpoint(Endpoint):
                 print 84
                 yield self._process_sendqueue()
 
-        print 85
+
         returnValue(True)
 
     @inlineCallbacks

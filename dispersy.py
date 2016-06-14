@@ -1508,7 +1508,7 @@ class Dispersy(TaskManager):
         3. In case 2 suceeded: Pass the packets to the community for further processing.
 
         """
-        print "in on_incoming_packets, dispewrsy.py"
+        print "in on_incoming_packets, dispersy.py"
         assert isinstance(packets, (tuple, list)), packets
         assert len(packets) > 0, packets
         assert all(isinstance(packet, tuple) for packet in packets), packets

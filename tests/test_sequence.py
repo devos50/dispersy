@@ -236,7 +236,7 @@ class TestIncomingMissingSequence(DispersyTestFunc):
             yield other.send_identity(node)
 
         messages = [other.create_sequence_text("Sequence message #%d" % i, i + 10, i) for i in range(1, 11)]
-        other.store(messages)
+        yield other.store(messages)
 
         # request missing
         # first, create all messages
@@ -253,7 +253,8 @@ class TestIncomingMissingSequence(DispersyTestFunc):
 
         # receive response
         for node in nodes:
-            responses = [response.distribution.sequence_number for _, response in node.receive_messages(names=[u"sequence-text"], timeout=0.1)]
+            messages = yield node.receive_messages(names=[u"sequence-text"], timeout=0.1)
+            responses = [response.distribution.sequence_number for _, response in ]messages
             self.assertEqual(len(responses), len(expected_responses))
 
             for seq, expected_seq in zip(responses, expected_responses):
@@ -275,7 +276,7 @@ class TestOutgoingMissingSequence(DispersyTestFunc):
 
         # NODE gives #5, hence OTHER will request [#1:#4]
         yield other.give_message(messages[4], node)
-        requests = node.receive_messages(names=[u"dispersy-missing-sequence"])
+        requests = yield node.receive_messages(names=[u"dispersy-missing-sequence"])
         self.assertEqual(len(requests), 1)
 
         _, request = requests[0]
@@ -292,7 +293,7 @@ class TestOutgoingMissingSequence(DispersyTestFunc):
 
         # NODE gives #10, hence OTHER will request [#6:#9]
         yield other.give_message(messages[9], node)
-        requests = node.receive_messages(names=[u"dispersy-missing-sequence"])
+        requests = yield node.receive_messages(names=[u"dispersy-missing-sequence"])
         self.assertEqual(len(requests), 1)
 
         _, request = requests[0]

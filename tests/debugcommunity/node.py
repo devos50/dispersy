@@ -133,6 +133,8 @@ class DebugNode(object):
             print "packets %s" % packets
             yield self.give_packets(packets, self._central_node)
 
+            print "---------------"
+
             # add this node to candidate list of mm
             message = self.create_introduction_request(self._central_node.my_candidate, self.lan_address, self.wan_address, False, u"unknown", None, 1, 1)
             yield self._central_node.give_message(message, self)
@@ -159,12 +161,11 @@ class DebugNode(object):
         Give multiple PACKETS directly to Dispersy on_incoming_packets.
         Returns PACKETS
         """
-        print "in give_packets, node.py"
+        print "in give_packets, node.py %s" % self
         assert isinstance(packets, list), type(packets)
         assert all(isinstance(packet, str) for packet in packets), [type(packet) for packet in packets]
         assert isinstance(source, DebugNode), type(source)
         assert isinstance(cache, bool), type(cache)
-        print "KOEK"
 
         self._logger.debug("%s giving %d bytes", self.my_candidate, sum(len(packet) for packet in packets))
         print self._dispersy.endpoint
@@ -295,8 +296,8 @@ class DebugNode(object):
         assert names is None or all(isinstance(name, unicode) for name in names), [type(name) for name in names]
 
         packets = yield self.receive_packet(addresses, timeout)
-        print "in node.py, receive_messages"
-        print "node.py, receive_messages: %s" % packets
+        print "in node.py, receive_message"
+        print "node.py, receive_message: %s" % packets
         if packets:
             for candidate, packet in packets:
                 try:
@@ -354,7 +355,8 @@ class DebugNode(object):
         Fetch all packets for MESSAGE_NAMES from the database and converts them into
         Message.Implementation instances.
         """
-        res = yield self._dispersy.convert_packets_to_messages(self.fetch_packets(message_names, mid), community=self._community, verify=False)
+        packets = yield self.fetch_packets(message_names, mid)
+        res = yield self._dispersy.convert_packets_to_messages(packets, community=self._community, verify=False)
         returnValue(res)
 
     @blocking_call_on_reactor_thread

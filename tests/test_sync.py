@@ -31,7 +31,7 @@ class TestSync(DispersyTestFunc):
                 sync = (1, 0, modulo, offset, [])
                 yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42), node)
 
-                responses = node.receive_messages(names=[u"full-sync-text"], return_after=len(global_times))
+                responses = yield node.receive_messages(names=[u"full-sync-text"], return_after=len(global_times))
                 response_times = [message.distribution.global_time for _, message in responses]
 
                 self.assertEqual(sorted(global_times), sorted(response_times))
@@ -48,7 +48,7 @@ class TestSync(DispersyTestFunc):
                 sync = (time_low, time_high, 1, 0, [])
                 yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", sync, 42), node)
 
-                responses = node.receive_messages(names=[u"full-sync-text"], return_after=len(global_times))
+                responses = yield node.receive_messages(names=[u"full-sync-text"], return_after=len(global_times))
                 response_times = [message.distribution.global_time for _, message in responses]
 
                 self.assertEqual(sorted(global_times), sorted(response_times))
@@ -61,7 +61,7 @@ class TestSync(DispersyTestFunc):
         # send an empty sync message to obtain all messages ASC order
         yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
 
-        responses = node.receive_messages(names=[u"ASC-text"], return_after=len(global_times))
+        responses = yield node.receive_messages(names=[u"ASC-text"], return_after=len(global_times))
         response_times = [message.distribution.global_time for _, message in responses]
 
         self.assertEqual(sorted(global_times), sorted(response_times))
@@ -74,7 +74,7 @@ class TestSync(DispersyTestFunc):
         # send an empty sync message to obtain all messages DESC order
         yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
 
-        responses = node.receive_messages(names=[u"DESC-text"], return_after=len(global_times))
+        responses = yield node.receive_messages(names=[u"DESC-text"], return_after=len(global_times))
         response_times = [message.distribution.global_time for _, message in responses]
 
         self.assertEqual(sorted(global_times), sorted(response_times))
@@ -87,7 +87,7 @@ class TestSync(DispersyTestFunc):
         # send an empty sync message to obtain all messages in RANDOM order
         yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (min(global_times), 0, 1, 0, []), 42), node)
 
-        responses = node.receive_messages(names=[u"RANDOM-text"], return_after=len(global_times))
+        responses = yield node.receive_messages(names=[u"RANDOM-text"], return_after=len(global_times))
         response_times = [message.distribution.global_time for _, message in responses]
 
         self.assertNotEqual(response_times, sorted(global_times))
@@ -110,7 +110,7 @@ class TestSync(DispersyTestFunc):
         # send an empty sync message to obtain all messages ALL messages
         yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (1, 0, 1, 0, []), 42), node)
 
-        received = node.receive_messages(names=[u"ASC-text", u"DESC-text", u"RANDOM-text"], return_after=30)
+        received = yield node.receive_messages(names=[u"ASC-text", u"DESC-text", u"RANDOM-text"], return_after=30)
 
         # all ASC-text must be received in-order of their global time (low to high)
         received_in_order = [message.distribution.global_time for _, message in received if message.name == u"ASC-text"]
@@ -142,7 +142,7 @@ class TestSync(DispersyTestFunc):
         # send an empty sync message to obtain all messages ALL messages
         yield other.give_message(node.create_introduction_request(other.my_candidate, node.lan_address, node.wan_address, False, u"unknown", (1, 0, 1, 0, []), 42), node)
 
-        received = node.receive_messages(names=[u"high-priority-text", u"low-priority-text", u"medium-priority-text"], return_after=30)
+        received = yield node.receive_messages(names=[u"high-priority-text", u"low-priority-text", u"medium-priority-text"], return_after=30)
 
         # the first should be the high-priority-text
         offset = 0

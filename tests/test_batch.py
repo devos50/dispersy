@@ -15,6 +15,7 @@ class TestBatch(DispersyTestFunc):
         self._small_batches_took = 0.0
 
     def test_bla(self):
+        print self._mm
         self.create_nodes()
 
     @inlineCallbacks

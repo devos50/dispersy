@@ -152,7 +152,7 @@ class TestAddressEstimation(DispersyTestFunc):
                            node)
 
         # NODE should receive an introduction-response with the corrected LAN address
-        responses = node.receive_messages(names=[u"dispersy-introduction-response"])
+        responses = yield node.receive_messages(names=[u"dispersy-introduction-response"])
         self.assertEqual(len(responses), 1)
         for _, response in responses:
             self.assertEqual(response.payload.destination_address, node.lan_address)
