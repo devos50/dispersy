@@ -179,9 +179,9 @@ class Community(TaskManager):
         assert isinstance(dispersy, Dispersy), type(dispersy)
         assert isInIOThread()
         logger.debug("retrieving all master members owning %s communities", cls.get_classification())
-        communities = yield dispersy.database.stormdb.fetchall((u"SELECT m.mid, m.public_key FROM community AS c JOIN member AS m ON m.id = c.master"
+        communities = yield dispersy.database.stormdb.fetchall(u"SELECT m.mid, m.public_key FROM community AS c JOIN member AS m ON m.id = c.master"
                                 u" WHERE c.classification = ?",
-                                (cls.get_classification(),)))
+                                (cls.get_classification(),))
         returnValue([dispersy.get_member(public_key=str(public_key)) if public_key else dispersy.get_member(mid=str(mid))
                 for mid, public_key, in communities])
 

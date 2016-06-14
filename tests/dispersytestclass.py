@@ -96,24 +96,17 @@ class DispersyTestFunc(TestCase):
             for _ in range(amount):
                 # TODO(emilon): do the log observer stuff instead
                 # callback.attach_exception_handler(self.on_callback_exception)
-                print "test %s" % 1
                 memory_database_argument = {'database_filename': u":memory:"} if memory_database else {}
                 working_directory = unicode(mkdtemp(suffix="_dispersy_test_session"))
 
-                print "test %s" % 2
                 dispersy = Dispersy(ManualEnpoint(0), working_directory, **memory_database_argument)
-                print "test %s" % 3
                 yield dispersy.initialize_statistics()
-                print "test %s" % 4
                 yield dispersy.start(autoload_discovery=autoload_discovery)
-                print "test %s" % 5
 
                 self.dispersy_objects.append(dispersy)
 
                 node = yield self._create_node(dispersy, communityclass, self._mm)
-                print "test %s" % 6
                 yield node.init_my_member(tunnel=tunnel, store_identity=store_identity)
-                print "test %s" % 7
 
                 nodes.append(node)
             self._logger.debug("create_nodes, nodes created: %s", nodes)
