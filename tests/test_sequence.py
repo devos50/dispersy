@@ -254,7 +254,7 @@ class TestIncomingMissingSequence(DispersyTestFunc):
         # receive response
         for node in nodes:
             messages = yield node.receive_messages(names=[u"sequence-text"], timeout=0.1)
-            responses = [response.distribution.sequence_number for _, response in ]messages
+            responses = [response.distribution.sequence_number for _, response in messages]
             self.assertEqual(len(responses), len(expected_responses))
 
             for seq, expected_seq in zip(responses, expected_responses):
