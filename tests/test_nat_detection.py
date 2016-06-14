@@ -111,6 +111,7 @@ class TestNATDetection(DispersyTestFunc):
 
 
 class TestAddressEstimation(DispersyTestFunc):
+
     def test_address_in_lan_function(self):
         # Positive cases:
         assert address_is_lan_without_netifaces("192.168.1.5")

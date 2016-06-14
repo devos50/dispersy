@@ -2243,7 +2243,6 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
             returnValue(False)
 
     @blocking_call_on_reactor_thread
-    @inlineCallbacks
     def stop(self, timeout=10.0):
         """
         Stops Dispersy.
@@ -2281,16 +2280,15 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                 else:
                     self._logger.warning("Attempting to unload %s which is not loaded", community)
 
+        results = {}
+
         self._logger.info('Stopping Dispersy Core..')
         if os.environ.get("DISPERSY_PRINT_STATISTICS", "False").lower() == "true":
             # output statistics before we stop
             if self._logger.isEnabledFor(logging.DEBUG):
-                yield self._statistics.update()
+                results[u"statistics"] = self._statistics.update()
                 self._logger.debug("\n%s", pformat(self._statistics.get_dict(), width=120))
         _runtime_statistics.clear()
-
-        self._logger.info("stopping the Dispersy core...")
-        results = {}
 
         # unload communities that are not defined
         unload_communities([community
@@ -2323,7 +2321,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                 return False
             return True
 
-        returnValue(gatherResults(results.values(), consumeErrors=True).addBoth(check_stop_status))
+        return gatherResults(results.values(), consumeErrors=True).addBoth(check_stop_status)
 
     def _stats_detailed_candidates(self):
         """

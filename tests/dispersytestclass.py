@@ -60,7 +60,7 @@ class DispersyTestFunc(TestCase):
         super(DispersyTestFunc, self).tearDown()
 
         for dispersy in self.dispersy_objects:
-            blockingCallFromThread(reactor, dispersy.stop)
+            dispersy.stop()
 
             peercache = os.path.join(dispersy._working_directory, PEERCACHE_FILENAME)
             if os.path.isfile(peercache):
