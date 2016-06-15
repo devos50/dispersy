@@ -3,6 +3,7 @@ import shutil
 from unittest import TestCase
 
 from nose.tools import raises
+from nose.twistedtools import deferred
 from twisted.internet.defer import inlineCallbacks
 
 from ..dispersydatabase import DispersyDatabase
@@ -32,6 +33,7 @@ class TestDatabase(TestCase):
             shutil.rmtree(self.TMP_DATA_DIR, ignore_errors=True)
 
     @raises(RuntimeError)
+    @deferred(timeout=10)
     @inlineCallbacks
     def test_unsupported_database_version(self):
         minimum_version_path = os.path.abspath(os.path.join(self.TEST_DATA_DIR, u"dispersy_v1.db"))
@@ -52,6 +54,7 @@ class TestDatabase(TestCase):
         self.assertEqual(database.database_version, 21)
 
     @raises(RuntimeError)
+    @deferred(timeout=10)
     @inlineCallbacks
     def test_upgrade_version_too_high(self):
         minimum_version_path = os.path.abspath(os.path.join(self.TEST_DATA_DIR, u"dispersy_v1337.db"))
