@@ -1891,6 +1891,9 @@ class Community(TaskManager):
                 sync_packet = self._dispersy.database.stormdb.fetchone(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ? LIMIT 1",
                     (member.database_id, self.get_meta_message(u"dispersy-identity").database_id))
 
+                everything = self._dispersy.database.stormdb.fetchall(u"SELECT * FROM sync")
+                print everything
+
                 if sync_packet is not None:
                     print 114
                     member.add_identity(self)
@@ -2309,8 +2312,9 @@ class Community(TaskManager):
         """
         We received a dispersy-identity message.
         """
-        print "appeltaart: %s" % messages
         for message in messages:
+            print message.meta.name
+            print "MESSAGE AUTH: %s" % message.authentication.member
             if message.authentication.member.mid == self._master_member.mid:
                 self._logger.debug("%s received master member", self._cid.encode("HEX"))
                 self._master_member = message.authentication.member
@@ -3297,7 +3301,8 @@ class Community(TaskManager):
         """
 
         for message in messages:
-            print "kersentaart: %s %s" % (message.authentication.member, message.authentication.member.public_key)
+            print message.meta.name
+            print "MESSAGE AUTH: %s" % message.authentication.member
             self.timeline.authorize(message.authentication.member, message.distribution.global_time, message.payload.permission_triplets, message)
 
     @inlineCallbacks

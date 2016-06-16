@@ -1,11 +1,10 @@
-from time import time, sleep
+from time import time
 
-from nose.twistedtools import reactor
+from nose.twistedtools import reactor, deferred
 from twisted.internet.defer import inlineCallbacks
 from twisted.internet.task import deferLater
 
 from .dispersytestclass import DispersyTestFunc
-
 
 class TestBatch(DispersyTestFunc):
 
@@ -14,9 +13,13 @@ class TestBatch(DispersyTestFunc):
         self._big_batch_took = 0.0
         self._small_batches_took = 0.0
 
+
+    @deferred(timeout=100000)
+    @inlineCallbacks
     def test_bla(self):
-        print self._mm
-        self.create_nodes()
+        print "MASTER MEMBER IN THIS TEST: %s" % self._mm
+        print "22222"
+        yield self.create_nodes()
 
     @inlineCallbacks
     def test_one_batch(self):

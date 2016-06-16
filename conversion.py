@@ -1069,13 +1069,14 @@ class NoDefBinaryConversion(Conversion):
         data = placeholder.data
 
         encoding = self.__get_authentication_encoding(authentication)
+        print "ENCODING: %s" % encoding
         if encoding == "sha1":
             if len(data) < offset + 20:
                 raise DropPacket("Insufficient packet size (_decode_member_authentication sha1)")
             member_id = data[offset:offset + 20]
             offset += 20
 
-            print " MEMBER_ID: %s" % member_id
+            print "MEMBER_ID: %s" % member_id
             member = self._community.get_member(mid=member_id)
             print "MEMBER (_decode_member_authentication): %s" % member
             # If signatures and verification are enabled, verify that the signature matches the member sha1 identifier
@@ -1214,6 +1215,7 @@ class NoDefBinaryConversion(Conversion):
         print 103
 
         # authentication
+        print self.decode_meta_message(data)
         print decode_functions.authentication
         decode_functions.authentication(placeholder)
 

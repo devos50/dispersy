@@ -270,7 +270,7 @@ class DebugNode(object):
 
                     candidate = Candidate(address, tunnel)
                     self._logger.debug("%d bytes from %s", len(packet), candidate)
-                    yield candidate, packet
+                    yield (candidate, packet)
             else:
                 yield deferLater(reactor, 0.001, lambda: None)
 
@@ -311,7 +311,7 @@ class DebugNode(object):
                     continue
 
                 self._logger.debug("%s (%d bytes) from %s", message.name, len(packet), candidate)
-                yield candidate, message
+                yield (candidate, message)
 
     @blocking_call_on_reactor_thread
     @inlineCallbacks

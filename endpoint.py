@@ -221,6 +221,7 @@ class StandaloneEndpoint(Endpoint):
 
         normal_packets = []
         for packet in packets:
+            print "INCOMING PACKET!!!"
             prefix = next((p for p in self.packet_handlers if
                            packet[1].startswith(p)), None)
             if prefix:

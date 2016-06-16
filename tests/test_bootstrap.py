@@ -107,7 +107,8 @@ class TestBootstrapServers(DispersyTestFunc):
             _, message = received_messsage.next()
             self.assertEqual(message.payload.mid, node.my_member.mid)
 
-            packet = yield node.fetch_packets([u"dispersy-identity", ], node.my_member.mid)[0]
+            packets = yield node.fetch_packets([u"dispersy-identity", ], node.my_member.mid)
+            packet = packets[0]
             yield node.send_packet(packet, destination)
 
             yield node.process_packets()
@@ -398,8 +399,8 @@ class TestBootstrapServers(DispersyTestFunc):
                 for member in members:
                     yield community.prepare_ping(member)
 
-                    yield deferLater(reactor, 5, lambda: None)
-                yield deferLater(reactor, 5, lambda: None)
+            yield deferLater(reactor, 5, lambda: None)
+        yield deferLater(reactor, 5, lambda: None)
 
         self._logger.info("ping-ping")
         BEGIN = time()

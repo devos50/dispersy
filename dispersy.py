@@ -451,6 +451,7 @@ class Dispersy(TaskManager):
         return self._progress_handlers
 
     def get_member(self, mid="", public_key="", private_key=""):
+        print "in get_member, dispersy.py public key: %r" % public_key
         """Returns a Member instance associated with public_key.
 
         Since we have the public_key, we can create this user if it doesn't yet.  Hence, this method always succeeds.
@@ -472,31 +473,46 @@ class Dispersy(TaskManager):
         assert not public_key or self.crypto.is_valid_public_bin(public_key)
         assert not private_key or self.crypto.is_valid_private_bin(private_key)
 
+        print "---- GET_MEMBER ---- dispersy.py"
+
+        print 1001
+
+        import traceback
+        print traceback.print_stack()
+
         if not mid:
+            print 1002
             if public_key:
+                print 1003
                 mid = sha1(public_key).digest()
 
             elif private_key:
+                print 1004
                 _key = self.crypto.key_from_private_bin(private_key)
                 mid = self.crypto.key_to_hash(_key.pub())
 
         member = self._member_cache_by_hash.get(mid)
         if member:
+            print 1005
             return member
 
         if private_key:
+            print 1006
             key = self.crypto.key_from_private_bin(private_key)
             public_key = self.crypto.key_to_bin(key.pub())
 
         elif public_key:
+            print 1007
             key = self.crypto.key_from_public_bin(public_key)
 
         # both public and private keys are valid at this point
 
         # The member is not cached, let's try to get it from the database
-        row = self.database.stormdb.fetchone(u"SELECT id, public_key, private_key FROM member WHERE mid = ? LIMIT 1", (buffer(mid),))
+        row = self.database.execute(u"SELECT id, public_key, private_key FROM member WHERE mid = ? LIMIT 1",
+                                    (buffer(mid),)).fetchone()
 
         if row:
+            print 1008
             database_id, public_key_from_db, private_key_from_db = row
 
             public_key_from_db = "" if public_key_from_db is None else str(public_key_from_db)
@@ -504,40 +520,52 @@ class Dispersy(TaskManager):
 
             # the private key that was passed as an argument overrules everything, update db if neccesary
             if private_key:
+                print 1009
                 assert public_key
                 if private_key_from_db != private_key:
-                    self.database.stormdb.execute(u"UPDATE member SET public_key = ?, private_key = ? WHERE id = ?",
-                        (buffer(public_key), buffer(private_key), database_id))
+                    print 1010
+                    self.database.execute(u"UPDATE member SET public_key = ?, private_key = ? WHERE id = ?",
+                                          (buffer(public_key), buffer(private_key), database_id))
             else:
+                print 1011
                 # the private key from the database overrules the public key argument
                 if private_key_from_db:
+                    print 1012
                     key = self.crypto.key_from_private_bin(private_key_from_db)
 
                 # the public key argument overrules anything in the database
                 elif public_key:
+                    print 1013
                     if public_key_from_db != public_key:
-                        self.database.stormdb.execute(u"UPDATE member SET public_key = ? WHERE id = ?",
-                            (buffer(public_key), database_id))
+                        print 1014
+                        self.database.execute(u"UPDATE member SET public_key = ? WHERE id = ?",
+                                              (buffer(public_key), database_id))
 
                 # no priv/pubkey arguments passed, maybe use the public key from the database
                 elif public_key_from_db:
+                    print 1015
                     key = self.crypto.key_from_public_bin(public_key_from_db)
 
                 else:
+                    print 1016
                     return DummyMember(self, database_id, mid)
+                print 1017
 
         # the member is not in the database, insert it
         elif public_key or private_key:
+            print 1018
             if private_key:
+                print 1019
                 assert public_key
             # The MID or public/private keys are not in the database, store them.
-            database_id = self.database.stormdb.execute(
+            database_id = self.database.execute(
                 u"INSERT INTO member (mid, public_key, private_key) VALUES (?, ?, ?)",
                 (buffer(mid), buffer(public_key), buffer(private_key)), get_lastrowid=True)
         else:
+            print 1020
             # We could't find the key on the DB, nothing else to do
-            database_id = self.database.stormdb.execute(u"INSERT INTO member (mid) VALUES (?)",
-                (buffer(mid),), get_lastrowid=True)
+            database_id = self.database.execute(u"INSERT INTO member (mid) VALUES (?)",
+                                                (buffer(mid),), get_lastrowid=True)
             return DummyMember(self, database_id, mid)
 
         member = Member(self, key, database_id, mid)
@@ -547,8 +575,10 @@ class Dispersy(TaskManager):
 
         # limit cache length
         if len(self._member_cache_by_hash) > 1024:
+            print 1021
             self._member_cache_by_hash.popitem(False)
 
+        print 1022
         return member
 
     def get_new_member(self, securitylevel=u"medium"):
@@ -1593,6 +1623,17 @@ class Dispersy(TaskManager):
                                message.authentication.member.database_id, message.distribution.global_time)
 
             # add packet to database
+            print "vlaaientaart"
+            print meta
+            print (message.community.database_id,
+                message.authentication.member.database_id,
+                message.distribution.global_time,
+                message.database_id,
+                buffer(message.packet),
+                (message.distribution.sequence_number if
+                 isinstance(meta.distribution, FullSyncDistribution)
+                 and message.distribution.enable_sequence_number else None)
+                )
             message.packet_id = self._database.stormdb.execute(
                 u"INSERT INTO sync (community, member, global_time, meta_message, packet, sequence) "
                 u"VALUES (?, ?, ?, ?, ?, ?)",
@@ -2234,7 +2275,8 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                 self._logger.info("Dispersy core loading DiscoveryCommunity")
 
                 # TODO: pass None instead of new member, let community decide if we need a new member or not.
-                self._discovery_community = yield self.define_auto_load(DiscoveryCommunity, self.get_new_member(), load=True)[0]
+                auto_load_result = yield self.define_auto_load(DiscoveryCommunity, self.get_new_member(), load=True)
+                self._discovery_community = auto_load_result[0]
             returnValue(True)
 
         else:

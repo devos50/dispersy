@@ -109,6 +109,7 @@ class TestIncomingMissingSequence(DispersyTestFunc):
     def test_requests_1_6(self):
         yield self.requests(1, [3, 4, 5, 6, 7], (3, 7))
 
+    @inlineCallbacks
     def test_requests_2_1(self):
         yield self.requests(2, [1], (1, 1))
 
