@@ -17,8 +17,7 @@ class TestBatch(DispersyTestFunc):
     @deferred(timeout=100000)
     @inlineCallbacks
     def test_bla(self):
-        print "MASTER MEMBER IN THIS TEST: %s" % self._mm
-        print "22222"
+        print "-------------------------"
         yield self.create_nodes()
 
     @inlineCallbacks

@@ -255,6 +255,7 @@ class Community(TaskManager):
 
         super(Community, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
+        self._logger.setLevel(logging.DEBUG)
 
         # Dispersy
         self._dispersy = dispersy
@@ -1871,38 +1872,25 @@ class Community(TaskManager):
         assert not public_key or self._dispersy.crypto.is_valid_public_bin(public_key)
         assert not private_key or self._dispersy.crypto.is_valid_private_bin(private_key)
 
-        print "=-=-=-=-=-=-=-=-=-= get_member in community .py =-=-=-=-=-=-=-=-=-="
-        print "mid: %s" % mid
-        print "public_key: %s" % public_key
-        print "private key: %s" % private_key
-
         member = self._dispersy.get_member(mid=mid, public_key=public_key, private_key=private_key)
         # We only need to check if this member has an identity message in this community if we still don't have the full
         # public key
         if not mid:
-            print 111
             return member
         if isinstance(member, Member):
-            print 112
             has_identity = member.has_identity(self)
             if not has_identity:
-                print 113
                 # check database and update identity set if found
                 sync_packet = self._dispersy.database.stormdb.fetchone(u"SELECT 1 FROM sync WHERE member = ? AND meta_message = ? LIMIT 1",
                     (member.database_id, self.get_meta_message(u"dispersy-identity").database_id))
 
                 everything = self._dispersy.database.stormdb.fetchall(u"SELECT * FROM sync")
-                print everything
 
                 if sync_packet is not None:
-                    print 114
                     member.add_identity(self)
                     has_identity = True
             if has_identity:
-                print 115
                 return member
-        print 116
-        print "=-=-=-=-=-=-=-=-=-= get_member in community .py =-=-=-=-=-=-=-=-=-="
 
     @inlineCallbacks
     def _generic_timeline_check(self, messages):
@@ -1935,7 +1923,6 @@ class Community(TaskManager):
 
     @inlineCallbacks
     def _delay(self, match_info, delay, packet, candidate):
-        print "in _delay, community.py"
         assert len(match_info) == 4, match_info
         assert not match_info[0] or isinstance(match_info[0], unicode), type(match_info[0])
         assert not match_info[1] or isinstance(match_info[1], str), type(match_info[1])
@@ -1944,7 +1931,6 @@ class Community(TaskManager):
         assert not match_info[3] or isinstance(match_info[3], list), type(match_info[3])
 
         send_request = False
-        print 41
 
         # unwrap sequence number list
         seq_number_list = match_info[3] or [None]
@@ -1960,8 +1946,6 @@ class Community(TaskManager):
             self._delayed_value[delay].append(unwrapped_key)
 
         if send_request:
-            print 42
-            print delay
             yield delay.send_request(self, candidate)
             self._statistics.increase_delay_msg_count(u"send")
 
@@ -2044,7 +2028,6 @@ class Community(TaskManager):
         assert isinstance(cache, bool), cache
         assert isinstance(timestamp, float), timestamp
 
-        print "in on_incoming_packets, community.py"
         self._logger.debug("got %d incoming packets", len(packets))
 
         for _, iterator in groupby(packets, key=lambda tup: (tup[1][1], tup[1][22])):
@@ -2057,20 +2040,16 @@ class Community(TaskManager):
                 batch = [(self.get_candidate(candidate.sock_addr) or candidate, packet, conversion, source)
                          for candidate, packet in cur_packets]
                 if meta.batch.enabled and cache:
-                    print 1
                     if meta in self._batch_cache:
-                        print 2
                         _, current_batch = self._batch_cache[meta]
                         current_batch.extend(batch)
                         self._logger.debug("adding %d %s messages to existing cache", len(batch), meta.name)
                     else:
-                        print 3
                         self.register_task(meta, reactor.callLater(meta.batch.max_window, self._process_message_batch, meta))
                         self._batch_cache[meta] = (timestamp, batch)
                         self._logger.debug("new cache with %d %s messages (batch window: %d)",
                                            len(batch), meta.name, meta.batch.max_window)
                 else:
-                    print 4
                     yield self._on_batch_cache(meta, batch)
 
                 self._statistics.increase_total_received_count(len(cur_packets))
@@ -2126,7 +2105,6 @@ class Community(TaskManager):
         assert all(len(x) == 4 for x in batch)
 
         for candidate, packet, conversion, source in batch:
-            print 11
             assert isinstance(candidate, Candidate)
             assert isinstance(packet, str)
             assert isinstance(conversion, Conversion)
@@ -2135,25 +2113,21 @@ class Community(TaskManager):
                 # convert binary data to internal Message
                 # TODO(laurens_ place back in append
                 bla = conversion.decode_message(candidate, packet, source=source)
-                print 16
                 messages.append(bla)
 
             except DropPacket as drop:
-                print 12
                 self._drop(drop, packet, candidate)
 
             except DelayPacket as delay:
-                print 13
                 yield self._dispersy._delay(delay, packet, candidate)
 
         assert all(isinstance(message, Message.Implementation) for message in messages), "convert_batch_into_messages must return only Message.Implementation instances"
         assert all(message.meta == meta for message in messages), "All Message.Implementation instances must be in the same batch"
 
         # handle the incoming messages
+        self._logger.info("on_batch_cache, will process %d messages", len(messages))
         if messages:
-            print 14
             yield self.on_messages(messages)
-        print 15
 
     def purge_batch_cache(self):
         """
@@ -2222,12 +2196,16 @@ class Community(TaskManager):
 
         # drop all duplicate or old messages
         assert type(meta.distribution) in self._dispersy._check_distribution_batch_map
+        self._logger.info("in on_messages: going to check distribution %s", meta.distribution)
+        self._logger.info("in on_messages: will now execute %s", self._dispersy._check_distribution_batch_map[type(meta.distribution)])
         messages = list(self._dispersy._check_distribution_batch_map[type(meta.distribution)](messages))
+        self._logger.info("in on_messages: checked distribution, messages: %d", len(messages))
         # TODO(emilon): This seems iffy
         assert len(messages) > 0  # should return at least one item for each message
         assert all(isinstance(message, (Message.Implementation, DropMessage, DelayMessage)) for message in messages)
 
         # handle/remove DropMessage and DelayMessage instances
+        self._logger.info("on_messages: About to handle drop/delay messages")
         messages = []
         for message in messages:
             filter_fail_result = yield _filter_fail(message)
@@ -2235,7 +2213,10 @@ class Community(TaskManager):
                 messages.append(message)
 
         if not messages:
+            self._logger.info("in on_messages: no messages, returning")
             returnValue(0)
+
+        self._logger.info("in on_messages: about to check remaining messages")
 
         # check all remaining messages on the community side.  may yield Message.Implementation,
         # DropMessage, and DelayMessage instances
@@ -2263,6 +2244,7 @@ class Community(TaskManager):
                 possibly_messages.append(message)
 
         if not possibly_messages:
+            self._logger.info("in on_messages, returning because there are no possibly messages")
             returnValue(0)
 
         other = []
@@ -2280,6 +2262,7 @@ class Community(TaskManager):
                                if isinstance(message, Message.Implementation))))
 
         # store to disk and update locally
+        self._logger.info("in on_messages: about to store message!")
         result = yield self._dispersy.store_update_forward(possibly_messages, True, True, False)
         if result:
             self._statistics.increase_msg_count(u"success", meta.name, len(messages))
@@ -2313,8 +2296,6 @@ class Community(TaskManager):
         We received a dispersy-identity message.
         """
         for message in messages:
-            print message.meta.name
-            print "MESSAGE AUTH: %s" % message.authentication.member
             if message.authentication.member.mid == self._master_member.mid:
                 self._logger.debug("%s received master member", self._cid.encode("HEX"))
                 self._master_member = message.authentication.member
@@ -3042,7 +3023,6 @@ class Community(TaskManager):
 
     @inlineCallbacks
     def create_missing_identity(self, candidate, dummy_member):
-        print "in create_missing_identity, commmunity.py"
         """
         Create a dispersy-missing-identity message.
 
@@ -3301,8 +3281,6 @@ class Community(TaskManager):
         """
 
         for message in messages:
-            print message.meta.name
-            print "MESSAGE AUTH: %s" % message.authentication.member
             self.timeline.authorize(message.authentication.member, message.distribution.global_time, message.payload.permission_triplets, message)
 
     @inlineCallbacks

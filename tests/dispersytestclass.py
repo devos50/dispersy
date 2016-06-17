@@ -51,8 +51,6 @@ class DispersyTestFunc(TestCase):
         self._mm = None
         self._mm, = self.create_nodes()
 
-        print self._mm._community
-
         self._dispersy = self._mm._dispersy
         self._community = self._mm._community
 

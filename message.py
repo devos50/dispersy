@@ -87,10 +87,8 @@ class DelayPacketByMissingMember(DelayPacket):
 
     @inlineCallbacks
     def send_request(self, community, candidate):
-        print "in send_request, DelayPacketByMissingMember"
         missing_identity = yield community.create_missing_identity(candidate,
                     community.dispersy.get_member(mid=self._missing_member_id))
-        print "le missing identify: %s " % missing_identity
         returnValue(missing_identity)
 
 
@@ -109,7 +107,6 @@ class DelayPacketByMissingMessage(DelayPacket):
 
     @inlineCallbacks
     def send_request(self, community, candidate):
-        print "in send_request, DelayPacketByMissingMessage"
         missing_message = yield community.create_missing_message(candidate, self._member, self._global_time)
         returnValue(missing_message)
 

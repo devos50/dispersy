@@ -130,10 +130,7 @@ class DebugNode(object):
 
             # download mm identity, mm authorizing central_node._my_member
             packets = yield self._central_node.fetch_packets([u"dispersy-identity", u"dispersy-authorize"], self._community.master_member.mid)
-            print "packets %s" % packets
             yield self.give_packets(packets, self._central_node)
-
-            print "---------------"
 
             # add this node to candidate list of mm
             message = self.create_introduction_request(self._central_node.my_candidate, self.lan_address, self.wan_address, False, u"unknown", None, 1, 1)
@@ -161,14 +158,12 @@ class DebugNode(object):
         Give multiple PACKETS directly to Dispersy on_incoming_packets.
         Returns PACKETS
         """
-        print "in give_packets, node.py %s" % self
         assert isinstance(packets, list), type(packets)
         assert all(isinstance(packet, str) for packet in packets), [type(packet) for packet in packets]
         assert isinstance(source, DebugNode), type(source)
         assert isinstance(cache, bool), type(cache)
 
         self._logger.debug("%s giving %d bytes", self.my_candidate, sum(len(packet) for packet in packets))
-        print self._dispersy.endpoint
         yield self._dispersy.endpoint.process_packets([(source.lan_address, TUNNEL_PREFIX + packet if source.tunnel else packet) for packet in packets], cache=cache)
 
     @inlineCallbacks
@@ -188,9 +183,7 @@ class DebugNode(object):
         packets = [message.packet if message.packet else self.encode_message(message) for message in messages]
         self._logger.debug("%s giving %d messages (%d bytes)",
                            self.my_candidate, len(messages), sum(len(packet) for packet in packets))
-        print "in give_messages before give_packets"
         yield self.give_packets(packets, source, cache=cache)
-        print "messages delivered to node!"
 
     @inlineCallbacks
     def send_packet(self, packet, candidate):
@@ -224,11 +217,9 @@ class DebugNode(object):
         """
         Process all packets on the nodes' socket.
         """
-        print "in process-packets, node.py"
         timeout = time() + timeout
         while timeout > time():
             packets = yield self._dispersy.endpoint.process_receive_queue()
-            print " I have le receive packets: %s" % packets
             if packets:
                 returnValue(packets)
             else:
@@ -296,8 +287,6 @@ class DebugNode(object):
         assert names is None or all(isinstance(name, unicode) for name in names), [type(name) for name in names]
 
         packets = yield self.receive_packet(addresses, timeout)
-        print "in node.py, receive_message"
-        print "node.py, receive_message: %s" % packets
         if packets:
             for candidate, packet in packets:
                 try:
@@ -557,7 +546,6 @@ class DebugNode(object):
         """
         Returns a new dispersy-missing-identity message.
         """
-        print "in create_missing_identity, node.py"
         assert isinstance(dummy_member, Member), type(dummy_member)
         meta = self._community.get_meta_message(u"dispersy-missing-identity")
 

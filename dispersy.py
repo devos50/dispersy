@@ -106,6 +106,7 @@ class Dispersy(TaskManager):
         assert isinstance(crypto, DispersyCrypto), type(crypto)
         super(Dispersy, self).__init__()
         self._logger = logging.getLogger(self.__class__.__name__)
+        self._logger.setLevel(logging.DEBUG)
 
         self.running = False
 
@@ -451,7 +452,6 @@ class Dispersy(TaskManager):
         return self._progress_handlers
 
     def get_member(self, mid="", public_key="", private_key=""):
-        print "in get_member, dispersy.py public key: %r" % public_key
         """Returns a Member instance associated with public_key.
 
         Since we have the public_key, we can create this user if it doesn't yet.  Hence, this method always succeeds.
@@ -473,36 +473,23 @@ class Dispersy(TaskManager):
         assert not public_key or self.crypto.is_valid_public_bin(public_key)
         assert not private_key or self.crypto.is_valid_private_bin(private_key)
 
-        print "---- GET_MEMBER ---- dispersy.py"
-
-        print 1001
-
-        import traceback
-        print traceback.print_stack()
-
         if not mid:
-            print 1002
             if public_key:
-                print 1003
                 mid = sha1(public_key).digest()
 
             elif private_key:
-                print 1004
                 _key = self.crypto.key_from_private_bin(private_key)
                 mid = self.crypto.key_to_hash(_key.pub())
 
         member = self._member_cache_by_hash.get(mid)
         if member:
-            print 1005
             return member
 
         if private_key:
-            print 1006
             key = self.crypto.key_from_private_bin(private_key)
             public_key = self.crypto.key_to_bin(key.pub())
 
         elif public_key:
-            print 1007
             key = self.crypto.key_from_public_bin(public_key)
 
         # both public and private keys are valid at this point
@@ -512,7 +499,6 @@ class Dispersy(TaskManager):
                                     (buffer(mid),)).fetchone()
 
         if row:
-            print 1008
             database_id, public_key_from_db, private_key_from_db = row
 
             public_key_from_db = "" if public_key_from_db is None else str(public_key_from_db)
@@ -520,49 +506,37 @@ class Dispersy(TaskManager):
 
             # the private key that was passed as an argument overrules everything, update db if neccesary
             if private_key:
-                print 1009
                 assert public_key
                 if private_key_from_db != private_key:
-                    print 1010
                     self.database.execute(u"UPDATE member SET public_key = ?, private_key = ? WHERE id = ?",
                                           (buffer(public_key), buffer(private_key), database_id))
             else:
-                print 1011
                 # the private key from the database overrules the public key argument
                 if private_key_from_db:
-                    print 1012
                     key = self.crypto.key_from_private_bin(private_key_from_db)
 
                 # the public key argument overrules anything in the database
                 elif public_key:
-                    print 1013
                     if public_key_from_db != public_key:
-                        print 1014
                         self.database.execute(u"UPDATE member SET public_key = ? WHERE id = ?",
                                               (buffer(public_key), database_id))
 
                 # no priv/pubkey arguments passed, maybe use the public key from the database
                 elif public_key_from_db:
-                    print 1015
                     key = self.crypto.key_from_public_bin(public_key_from_db)
 
                 else:
-                    print 1016
                     return DummyMember(self, database_id, mid)
-                print 1017
 
         # the member is not in the database, insert it
         elif public_key or private_key:
-            print 1018
             if private_key:
-                print 1019
                 assert public_key
             # The MID or public/private keys are not in the database, store them.
             database_id = self.database.execute(
                 u"INSERT INTO member (mid, public_key, private_key) VALUES (?, ?, ?)",
                 (buffer(mid), buffer(public_key), buffer(private_key)), get_lastrowid=True)
         else:
-            print 1020
             # We could't find the key on the DB, nothing else to do
             database_id = self.database.execute(u"INSERT INTO member (mid) VALUES (?)",
                                                 (buffer(mid),), get_lastrowid=True)
@@ -575,10 +549,8 @@ class Dispersy(TaskManager):
 
         # limit cache length
         if len(self._member_cache_by_hash) > 1024:
-            print 1021
             self._member_cache_by_hash.popitem(False)
 
-        print 1022
         return member
 
     def get_new_member(self, securitylevel=u"medium"):
@@ -666,7 +638,6 @@ class Dispersy(TaskManager):
 
     @inlineCallbacks
     def get_community(self, cid, load=False, auto_load=True):
-        print "in get_community, dispersy.py"
         """
         Returns a community by its community id.
 
@@ -695,13 +666,10 @@ class Dispersy(TaskManager):
         assert isinstance(auto_load, bool)
 
         try:
-            print 31
             community = self._communities[cid]
-            print community
             returnValue(community)
 
         except KeyError:
-            print 32
             if load or auto_load:
                 try:
                     # have we joined this community
@@ -711,11 +679,8 @@ class Dispersy(TaskManager):
                     pass
 
                 else:
-                    print 33
                     if load or (auto_load and auto_load_flag):
-                        print 34
                         if classification in self._auto_load_communities:
-                            print 35
                             master = self.get_member(public_key=str(master_public_key)) if master_public_key else self.get_member(mid=cid)
                             cls, my_member, args, kargs = self._auto_load_communities[classification]
                             community = yield cls.init_community(self, master, my_member, *args, **kargs)
@@ -989,6 +954,7 @@ class Dispersy(TaskManager):
     @attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution full_sync")
     @inlineCallbacks
     def _check_full_sync_distribution_batch(self, messages):
+        self._logger.info("In _check_full_sync_distribution_batch")
         """
         Ensure that we do not yet have the messages and that, if sequence numbers are enabled, we
         are not missing any previous messages.
@@ -1138,6 +1104,7 @@ class Dispersy(TaskManager):
 
     @attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution last_sync")
     def _check_last_sync_distribution_batch(self, messages):
+        self._logger.info("# of messages: %d", len(messages))
         """
         Check that the messages do not violate any database consistency rules.
 
@@ -1175,6 +1142,7 @@ class Dispersy(TaskManager):
 
         @inlineCallbacks
         def check_member_and_global_time(unique, times, message):
+            self._logger.info("In check_member_and_global_time")
             """
             The member + global_time combination must always be unique in the database
             """
@@ -1188,6 +1156,7 @@ class Dispersy(TaskManager):
                 returnValue(DropMessage(message, "already processed message by member^global_time"))
 
             else:
+                self._logger.info("In else of check_member_and_global_time")
                 unique.add(key)
 
                 if not message.authentication.member.database_id in times:
@@ -1198,10 +1167,13 @@ class Dispersy(TaskManager):
                 tim = times[message.authentication.member.database_id]
 
                 is_duplicate_sync_message = yield self._is_duplicate_sync_message(message)
+                self._logger.info("is duplicate sync message: %s", is_duplicate_sync_message)
                 if message.distribution.global_time in tim and is_duplicate_sync_message:
+                    self._logger.info("In duplicate message of check_member_and_global_time")
                     returnValue(DropMessage(message, "duplicate message by member^global_time (3)"))
 
                 elif len(tim) >= message.distribution.history_size and min(tim) > message.distribution.global_time:
+                    self._logger.info("In elif of check_member_and_global_time")
                     # we have newer messages (drop)
 
                     # if the history_size is one, we can send that on message back because
@@ -1221,12 +1193,14 @@ class Dispersy(TaskManager):
                     returnValue(DropMessage(message, "old message by member^global_time"))
 
                 else:
+                    self._logger.info("In else 2 of check_member_and_global_time")
                     # we accept this message
                     tim.append(message.distribution.global_time)
                     returnValue(message)
 
         @inlineCallbacks
         def check_double_member_and_global_time(unique, times, message):
+            self._logger.info("In check_double_member_and_global_time")
             """
             No other message may exist with this message.authentication.members / global_time
             combination, regardless of the ordering of the members
@@ -1356,12 +1330,14 @@ class Dispersy(TaskManager):
 
         # for meta data messages
         if meta.distribution.custom_callback:
+            self._logger.info("in if-statement of _check_last_sync_distribution_batch")
             unique = set()
             times = {}
             messages = [message if isinstance(message, DropMessage) else meta.distribution.custom_callback[0](unique, times, message) for message in messages]
 
         # default behaviour
         elif isinstance(meta.authentication, MemberAuthentication):
+            self._logger.info("in elif-statement of _check_last_sync_distribution_batch")
             # a message is considered unique when (creator, global-time), i.r. (authentication.member,
             # distribution.global_time), is unique.  UNIQUE is used in the check_member_and_global_time
             # function
@@ -1379,6 +1355,7 @@ class Dispersy(TaskManager):
         # instead of storing HISTORY_SIZE messages for each authentication.member, we will store
         # HISTORY_SIZE messages for each combination of authentication.members.
         else:
+            self._logger.info("in else-statement of _check_last_sync_distribution_batch")
             assert isinstance(meta.authentication, DoubleMemberAuthentication)
             unique = set()
             times = {}
@@ -1391,6 +1368,10 @@ class Dispersy(TaskManager):
                     new_messages.append(m)
             messages = new_messages
 
+        import traceback
+        traceback.print_stack()
+
+        self._logger.info("returning %d messages in _check_last_sync_distribution_batch", len(messages))
         returnValue(messages)
 
     @attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution direct")
@@ -1538,7 +1519,6 @@ class Dispersy(TaskManager):
         3. In case 2 suceeded: Pass the packets to the community for further processing.
 
         """
-        print "in on_incoming_packets, dispersy.py"
         assert isinstance(packets, (tuple, list)), packets
         assert len(packets) > 0, packets
         assert all(isinstance(packet, tuple) for packet in packets), packets
@@ -1623,17 +1603,6 @@ class Dispersy(TaskManager):
                                message.authentication.member.database_id, message.distribution.global_time)
 
             # add packet to database
-            print "vlaaientaart"
-            print meta
-            print (message.community.database_id,
-                message.authentication.member.database_id,
-                message.distribution.global_time,
-                message.database_id,
-                buffer(message.packet),
-                (message.distribution.sequence_number if
-                 isinstance(meta.distribution, FullSyncDistribution)
-                 and message.distribution.enable_sequence_number else None)
-                )
             message.packet_id = self._database.stormdb.execute(
                 u"INSERT INTO sync (community, member, global_time, meta_message, packet, sequence) "
                 u"VALUES (?, ?, ?, ?, ?, ?)",
@@ -1879,17 +1848,12 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
         result = True
         meta = messages[0].meta
-        print "in _forward, dispersy.py"
-        print meta.destination
         if isinstance(meta.destination, (CommunityDestination, CandidateDestination)):
-            print 51
             for message in messages:
-                print 52
                 # CandidateDestination.candidates may be empty
                 candidates = set(message.destination.candidates)
                 # CommunityDestination.node_count is allowed to be zero
                 if isinstance(meta.destination, CommunityDestination) and meta.destination.node_count > 0:
-                    print 53
                     max_candidates = meta.destination.node_count + len(candidates)
                     for candidate in meta.community.dispersy_yield_verified_candidates():
                         if len(candidates) < max_candidates:
@@ -1905,7 +1869,6 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
     @inlineCallbacks
     def _delay(self, delay, packet, candidate):
-        print "in_delay, dispersy.py"
         for key in delay.match_info:
             assert len(key) == 5, key
             assert isinstance(key[0], str), type(key[0])
@@ -1918,17 +1881,13 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
 
             try:
-                print 21
                 community = yield self.get_community(key[0], load=False, auto_load=False)
-                print "le community: %s " % community
                 yield community._delay(key[1:], delay, packet, candidate)
             except CommunityNotFoundException:
-                print 22
                 self._logger.error('Messages can only be delayed for loaded communities.')
 
     @inlineCallbacks
     def _send(self, candidates, messages):
-        print "in _send, dispersy.py"
         """
         Send a list of messages to a list of candidates. If no candidates are specified or endpoint reported
         a failure this method will return False.
@@ -1949,17 +1908,12 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
         messages_send = False
         if len(candidates) and len(messages):
-            print 61
             packets = [message.packet for message in messages]
             messages_send = yield self._endpoint.send(candidates, packets)
 
         if messages_send:
-            print 62
             for message in messages:
-                print 63
-                print message.meta.name
                 if message.meta.name == u"dispersy-introduction-request":
-                    print 64
                     for candidate in candidates:
                         message.community.statistics.msg_statistics.walk_attempt_count += 1
                         message.community.statistics.increase_msg_count(u"outgoing_intro", candidate.sock_addr)
@@ -1971,7 +1925,6 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
                 message.community.statistics.increase_msg_count(
                     u"outgoing", message.meta.name, len(candidates))
 
-        print "messages sent: %s" % messages_send
         returnValue(messages_send)
 
     @inlineCallbacks
