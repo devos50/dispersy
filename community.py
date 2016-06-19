@@ -2198,7 +2198,8 @@ class Community(TaskManager):
         assert type(meta.distribution) in self._dispersy._check_distribution_batch_map
         self._logger.info("in on_messages: going to check distribution %s", meta.distribution)
         self._logger.info("in on_messages: will now execute %s", self._dispersy._check_distribution_batch_map[type(meta.distribution)])
-        messages = list(self._dispersy._check_distribution_batch_map[type(meta.distribution)](messages))
+        messages = yield self._dispersy._check_distribution_batch_map[type(meta.distribution)](messages)
+        messages = list(messages)
         self._logger.info("in on_messages: checked distribution, messages: %d", len(messages))
         # TODO(emilon): This seems iffy
         assert len(messages) > 0  # should return at least one item for each message

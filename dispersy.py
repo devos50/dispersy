@@ -1103,6 +1103,7 @@ class Dispersy(TaskManager):
                 yield message
 
     @attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution last_sync")
+    @inlineCallbacks
     def _check_last_sync_distribution_batch(self, messages):
         self._logger.info("# of messages: %d", len(messages))
         """
