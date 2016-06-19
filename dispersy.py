@@ -1787,7 +1787,8 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
             yield self._store(messages)
 
         if update:
-            if self._update(possibly_messages) == False:
+            update_res = yield self._update(possibly_messages)
+            if update_res == False:
                 returnValue(False)
 
         # 07/10/11 Boudewijn: we will only commit if it the message was create by our self.
@@ -1808,18 +1809,19 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
         returnValue(True)
 
     @attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
+    @inlineCallbacks
     def _update(self, messages):
         """
         Call the handle callback of a list of messages of the same type.
         """
         try:
-            messages[0].handle_callback(messages)
-            return True
+            yield messages[0].handle_callback(messages)
+            returnValue(True)
         except (SystemExit, KeyboardInterrupt, GeneratorExit, AssertionError):
             raise
-        except:
+        except Exception:
             self._logger.exception("exception during handle_callback for %s", messages[0].name)
-            return False
+            returnValue(False)
 
     @attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
     @inlineCallbacks
