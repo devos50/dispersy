@@ -1894,24 +1894,29 @@ class Community(TaskManager):
 
     @inlineCallbacks
     def _generic_timeline_check(self, messages):
+        res_list = []
         meta = messages[0].meta
         if isinstance(meta.authentication, NoAuthentication):
             # we can not timeline.check this message because it uses the NoAuthentication policy
             for message in messages:
-                yield message
+                self._logger.info("in _generic_timeline_check, yielding message")
+                res_list.append(message)
 
         else:
             for message in messages:
                 allowed, proofs = self.timeline.check(message)
                 if allowed:
-                    yield message
+                    self._logger.info("in _generic_timeline_check, yielding allowed message")
+                    res_list.append(message)
                 else:
                     # reply with all proofs when message is rejected and has dynamicresolution
                     # in order to "fix" differences in dynamic resolution policy between us and the candidate
                     if isinstance(meta.resolution, DynamicResolution):
                         yield self._dispersy._send_packets([message.candidate], [proof.packet for proof in proofs], self, "-caused by dynamic resolution-")
 
-                    yield DelayMessageByProof(message)
+                    res_list.append(DelayMessageByProof(message))
+
+        returnValue(res_list)
 
     def _drop(self, drop, packet, candidate):
         self._logger.warning("drop a %d byte packet %s from %s", len(packet), drop, candidate)
@@ -2207,22 +2212,26 @@ class Community(TaskManager):
 
         # handle/remove DropMessage and DelayMessage instances
         self._logger.info("on_messages: About to handle drop/delay messages")
-        messages = []
+        messages_arr = []
         for message in messages:
             filter_fail_result = yield _filter_fail(message)
             if filter_fail_result:
-                messages.append(message)
+                self._logger.info("on_messages: _filter_fail returned true, appending message")
+                messages_arr.append(message)
 
-        if not messages:
+        if not messages_arr:
             self._logger.info("in on_messages: no messages, returning")
             returnValue(0)
+
+        messages = messages_arr
 
         self._logger.info("in on_messages: about to check remaining messages")
 
         # check all remaining messages on the community side.  may yield Message.Implementation,
         # DropMessage, and DelayMessage instances
         try:
-            possibly_messages = list(meta.check_callback(messages))
+            possibly_messages = yield meta.check_callback(messages)
+            #possibly_messages = list(meta.check_callback(messages))
         except:
             self._logger.exception("exception during check_callback for %s", meta.name)
             returnValue(0)
@@ -2238,15 +2247,17 @@ class Community(TaskManager):
                                  meta.check_callback)
 
         # handle/remove DropMessage and DelayMessage instances
-        possibly_messages = []
+        possibly_messages_res = []
         for message in possibly_messages:
             filter_fail_result = yield _filter_fail(message)
             if filter_fail_result:
-                possibly_messages.append(message)
+                possibly_messages_res.append(message)
 
-        if not possibly_messages:
+        if not possibly_messages_res:
             self._logger.info("in on_messages, returning because there are no possibly messages")
             returnValue(0)
+
+        possibly_messages = possibly_messages_res
 
         other = []
         messages = []
@@ -2505,17 +2516,22 @@ class Community(TaskManager):
                 assert new_submsg.authentication.is_signed
                 yield self.dispersy.store_update_forward([new_submsg], True, True, True)
 
+    @inlineCallbacks
     def check_introduction_request(self, messages):
+        res_list = []
         """
         We received a dispersy-introduction-request message.
         """
         for message in messages:
             if message.authentication.member.mid == self.my_member.mid:
                 self._logger.debug("dropping dispersy-introduction-request, same mid.")
-                yield DropMessage(message, "Received introduction_request from my_member [%s]" % str(message.candidate))
+                res_list.append(DropMessage(message, "Received introduction_request from my_member [%s]" % str(message.candidate)))
                 continue
 
-            yield message
+            res_list.append(message)
+
+        yield res_list
+        returnValue(res_list)
 
     @inlineCallbacks
     def on_introduction_request(self, messages, extra_payload=None):

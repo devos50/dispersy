@@ -248,6 +248,7 @@ class DebugNode(object):
         while timeout > time():
             packets = self._dispersy.endpoint.clear_receive_queue()
             if packets:
+                return_list = []
                 for address, packet in packets:
                     if not (addresses is None or address in addresses or (address[0] == "127.0.0.1" and ("0.0.0.0", address[1]) in addresses)):
                         self._logger.debug("Ignored %d bytes from %s:%d", len(packet), address[0], address[1])
@@ -261,7 +262,9 @@ class DebugNode(object):
 
                     candidate = Candidate(address, tunnel)
                     self._logger.debug("%d bytes from %s", len(packet), candidate)
-                    yield (candidate, packet)
+                    return_list.append((candidate, packet))
+                print "will return %s" % return_list
+                returnValue(iter(return_list))
             else:
                 yield deferLater(reactor, 0.001, lambda: None)
 
@@ -288,6 +291,7 @@ class DebugNode(object):
 
         packets = yield self.receive_packet(addresses, timeout)
         if packets:
+            return_list = []
             for candidate, packet in packets:
                 try:
                     message = self.decode_message(candidate, packet)
@@ -300,7 +304,11 @@ class DebugNode(object):
                     continue
 
                 self._logger.debug("%s (%d bytes) from %s", message.name, len(packet), candidate)
-                yield (candidate, message)
+                return_list.append((candidate, message))
+
+            returnValue(iter(return_list))
+
+        returnValue(iter([]))
 
     @blocking_call_on_reactor_thread
     @inlineCallbacks

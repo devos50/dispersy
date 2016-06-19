@@ -954,6 +954,7 @@ class Dispersy(TaskManager):
     @attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution full_sync")
     @inlineCallbacks
     def _check_full_sync_distribution_batch(self, messages):
+        return_list = []
         self._logger.info("In _check_full_sync_distribution_batch")
         """
         Ensure that we do not yet have the messages and that, if sequence numbers are enabled, we
@@ -1002,16 +1003,16 @@ class Dispersy(TaskManager):
             # all messages must follow the sequence_number order
             for message in messages:
                 if message.distribution.global_time > acceptable_global_time:
-                    yield DropMessage(message, "global time is not within acceptable range (%d, we accept %d)" % (message.distribution.global_time, acceptable_global_time))
+                    return_list.append(DropMessage(message, "global time is not within acceptable range (%d, we accept %d)" % (message.distribution.global_time, acceptable_global_time)))
                     continue
 
                 if not message.distribution.pruning.is_active():
-                    yield DropMessage(message, "message has been pruned")
+                    return_list.append(DropMessage(message, "message has been pruned"))
                     continue
 
                 key = (message.authentication.member.database_id, message.distribution.global_time)
                 if key in unique:
-                    yield DropMessage(message, "duplicate message by member^global_time (1)")
+                    return_list.append(DropMessage(message, "duplicate message by member^global_time (1)"))
                     continue
 
                 unique.add(key)
@@ -1025,7 +1026,7 @@ class Dispersy(TaskManager):
                                                   (message.authentication.member.database_id, message.database_id, message.distribution.sequence_number - 1))
                     packet = str(packet)
                     if message.packet == packet:
-                        yield DropMessage(message, "duplicate message by binary packet")
+                        return_list.append(DropMessage(message, "duplicate message by binary packet"))
                         continue
 
                     else:
@@ -1036,7 +1037,7 @@ class Dispersy(TaskManager):
                             # reply with the packet to let the peer know
                             yield self._send_packets([message.candidate], [packet],
                                 message.community, "-caused by check_full_sync-")
-                            yield DropMessage(message, "duplicate message by sequence number (1)")
+                            return_list.append(DropMessage(message, "duplicate message by sequence number (1)"))
                             continue
 
                         else:
@@ -1053,7 +1054,7 @@ class Dispersy(TaskManager):
 
                 elif seq + 1 != message.distribution.sequence_number:
                     # we do not have the previous message (delay and request)
-                    yield DelayMessageBySequence(message, seq + 1, message.distribution.sequence_number - 1)
+                    return_list.append(DelayMessageBySequence(message, seq + 1, message.distribution.sequence_number - 1))
                     continue
 
                 # we have the previous message, check for duplicates based on community,
@@ -1061,33 +1062,33 @@ class Dispersy(TaskManager):
                 is_duplicate_sync_message = yield self._is_duplicate_sync_message(message)
                 if is_duplicate_sync_message:
                     # we have the previous message (drop)
-                    yield DropMessage(message, "duplicate message by global_time (1)")
+                    return_list.append(DropMessage(message, "duplicate message by global_time (1)"))
                     continue
 
                 # ensure that MESSAGE.distribution.global_time > LAST_GLOBAL_TIME
                 if last_global_time and message.distribution.global_time <= last_global_time:
                     self._logger.debug("last_global_time: %d  message @%d",
                                        last_global_time, message.distribution.global_time)
-                    yield DropMessage(message, "higher sequence number with lower global time than most recent message")
+                    return_list.append(DropMessage(message, "higher sequence number with lower global time than most recent message"))
                     continue
 
                 # we accept this message
                 highest[message.authentication.member.database_id] = (message.distribution.global_time, seq + 1)
-                yield message
+                return_list.append(message)
 
         else:
             for message in messages:
                 if message.distribution.global_time > acceptable_global_time:
-                    yield DropMessage(message, "global time is not within acceptable range")
+                    return_list.append(DropMessage(message, "global time is not within acceptable range"))
                     continue
 
                 if not message.distribution.pruning.is_active():
-                    yield DropMessage(message, "message has been pruned")
+                    return_list.append(DropMessage(message, "message has been pruned"))
                     continue
 
                 key = (message.authentication.member.database_id, message.distribution.global_time)
                 if key in unique:
-                    yield DropMessage(message, "duplicate message by member^global_time (2)")
+                    return_list.append(DropMessage(message, "duplicate message by member^global_time (2)"))
                     continue
 
                 unique.add(key)
@@ -1096,11 +1097,13 @@ class Dispersy(TaskManager):
                 is_duplicate_sync_message = yield self._is_duplicate_sync_message(message)
                 if is_duplicate_sync_message:
                     # we have the previous message (drop)
-                    yield DropMessage(message, "duplicate message by global_time (2)")
+                    return_list.append(DropMessage(message, "duplicate message by global_time (2)"))
                     continue
 
                 # we accept this message
-                yield message
+                return_list.append(message)
+
+        returnValue(return_list)
 
     @attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution last_sync")
     @inlineCallbacks
@@ -1369,8 +1372,8 @@ class Dispersy(TaskManager):
                     new_messages.append(m)
             messages = new_messages
 
-        import traceback
-        traceback.print_stack()
+        #import traceback
+        #traceback.print_stack()
 
         self._logger.info("returning %d messages in _check_last_sync_distribution_batch", len(messages))
         returnValue(messages)
