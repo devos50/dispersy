@@ -2861,6 +2861,7 @@ class Community(TaskManager):
         sql = "".join((u"SELECT * FROM (", " UNION ALL ".join(get_sub_select(meta) for meta in meta_messages), ")"))
         self._logger.debug(sql)
 
+        return_messages = []
         for message, time_low, time_high, offset, modulo in requests:
             sql_arguments = []
             for meta in meta_messages:
@@ -2872,8 +2873,10 @@ class Community(TaskManager):
                 sql_arguments.extend((meta.database_id, _time_low, time_high, offset, modulo))
             self._logger.debug("%s", sql_arguments)
 
-            sync_packets = yield self._dispersy.database.stormdb.fetchall(sql, sql_arguments)
-            yield message, ((str(packet),) for packet, in sync_packets)
+            db_res = yield self._dispersy.database.stormdb.fetchall(sql, sql_arguments)
+            return_messages.append((message, ((str(packet),) for packet, in db_res)))
+
+        returnValue(iter(return_messages))
 
     def check_puncture_request(self, messages):
         for message in messages:
