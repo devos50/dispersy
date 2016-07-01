@@ -9,6 +9,8 @@ from select import select
 from time import time
 
 from twisted.internet import reactor
+from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.python.threadable import isInIOThread
 
 from util import is_valid_address_or_log
 from .candidate import Candidate
@@ -51,9 +53,10 @@ class Endpoint(object):
         assert isinstance(timeout, float), type(timeout)
         return True
 
+    @inlineCallbacks
     def log_packet(self, sock_addr, packet, outbound=True):
         try:
-            community = self._dispersy.get_community(packet[2:22], load=False, auto_load=False)
+            community = yield self._dispersy.get_community(packet[2:22], load=False, auto_load=False)
 
             # find associated conversion
             conversion = community.get_conversion_for_packet(packet)
@@ -172,6 +175,7 @@ class StandaloneEndpoint(Endpoint):
 
         return super(StandaloneEndpoint, self).close(timeout) and result
 
+    @inlineCallbacks
     def _loop(self):
         assert self._dispersy, "Should not be called before open(...)"
         recvfrom = self._socket.recvfrom
@@ -188,7 +192,7 @@ class StandaloneEndpoint(Endpoint):
 
             # Furthermore, if we are allowed to send, process sendqueue immediately
             if write_list:
-                self._process_sendqueue()
+                yield self._process_sendqueue()
                 prev_sendqueue = time()
 
             if read_list:
@@ -208,8 +212,9 @@ class StandaloneEndpoint(Endpoint):
                 finally:
                     if packets:
                         self._logger.debug('%d came in, %d bytes in total', len(packets), sum(len(packet) for _, packet in packets))
-                        self.data_came_in(packets)
+                        yield self.data_came_in(packets)
 
+    @inlineCallbacks
     def data_came_in(self, packets, cache=True):
         assert self._dispersy, "Should not be called before open(...)"
         assert isinstance(packets, (list, tuple)), type(packets)
@@ -228,11 +233,12 @@ class StandaloneEndpoint(Endpoint):
             self._dispersy.statistics.total_down += sum(len(data) for _, data in normal_packets)
             if self._logger.isEnabledFor(logging.DEBUG):
                 for sock_addr, data in normal_packets:
-                    self.log_packet(sock_addr, data, outbound=False)
+                    yield self.log_packet(sock_addr, data, outbound=False)
 
-            # The endpoint runs on it's own thread, so we can't do a callLater here
+            # The endpoint runs on its own thread, so we can't do a callLater here
             reactor.callFromThread(self.dispersythread_data_came_in, normal_packets, time(), cache)
 
+    @inlineCallbacks
     def dispersythread_data_came_in(self, packets, timestamp, cache=True):
         assert self._dispersy, "Should not be called before open(...)"
 
@@ -244,18 +250,17 @@ class StandaloneEndpoint(Endpoint):
                     yield False, sock_addr, data
 
         try:
-            self._dispersy.on_incoming_packets([(Candidate(sock_addr, tunnel), data)
-                                                for tunnel, sock_addr, data
-                                                in strip_if_tunnel(packets)
-                                                if is_valid_address_or_log(sock_addr, data)],
-                                               cache,
-                                               timestamp,
-                                               u"standalone_ep")
+            yield self._dispersy.on_incoming_packets([(Candidate(sock_addr, tunnel), data)
+                                                      for tunnel, sock_addr, data
+                                                      in strip_if_tunnel(packets)
+                                                      if is_valid_address_or_log(sock_addr, data)],
+                                                     cache, timestamp, u"standalone_ep")
         except AssertionError:
             # TODO(Martijn): this effectively disables all assertions, making it harder to crash Tribler clients with
             # malformed packets. We should replace this with a more robust design once we redesign Dispersy.
             self._logger.exception("Ignored assertion error in Dispersy")
 
+    @inlineCallbacks
     def send(self, candidates, packets, prefix=None):
         assert self._dispersy, "Should not be called before open(...)"
         assert isinstance(candidates, (tuple, list, set)), type(candidates)
@@ -272,11 +277,13 @@ class StandaloneEndpoint(Endpoint):
 
         send_packet = False
         for candidate, packet in product(candidates, packets):
-            if self.send_packet(candidate, packet):
+            send_packet_result = yield self.send_packet(candidate, packet)
+            if send_packet_result:
                 send_packet = True
 
-        return send_packet
+        returnValue(send_packet)
 
+    @inlineCallbacks
     def send_packet(self, candidate, packet, prefix=None):
         assert self._dispersy, "Should not be called before open(...)"
         assert isinstance(candidate, Candidate), type(candidate)
@@ -297,7 +304,7 @@ class StandaloneEndpoint(Endpoint):
             self._socket.sendto(data, candidate.sock_addr)
 
             if self._logger.isEnabledFor(logging.DEBUG):
-                self.log_packet(candidate.sock_addr, packet)
+                yield self.log_packet(candidate.sock_addr, packet)
 
         except socket.error:
             with self._sendqueue_lock:
@@ -306,10 +313,11 @@ class StandaloneEndpoint(Endpoint):
 
             # If we did not have a sendqueue, then we need to call process_sendqueue in order send these messages
             if not did_have_senqueue:
-                self._process_sendqueue()
+                yield self._process_sendqueue()
 
-        return True
+        returnValue(True)
 
+    @inlineCallbacks
     def _process_sendqueue(self):
         assert self._dispersy, "Should not be called before start(...)"
         with self._sendqueue_lock:
@@ -329,7 +337,7 @@ class StandaloneEndpoint(Endpoint):
                             index += 1
 
                             if self._logger.isEnabledFor(logging.DEBUG):
-                                self.log_packet(sock_addr, data)
+                                yield self.log_packet(sock_addr, data)
 
                         except socket.error as e:
                             if e[0] != SOCKET_BLOCK_ERRORCODE:
@@ -373,11 +381,13 @@ class ManualEnpoint(StandaloneEndpoint):
                          len(packets), sum(len(packet) for _, packet in packets))
         return packets
 
+    @inlineCallbacks
     def process_receive_queue(self):
         packets = self.clear_receive_queue()
-        self.process_packets(packets)
-        return packets
+        yield self.process_packets(packets)
+        returnValue(packets)
 
+    @inlineCallbacks
     def process_packets(self, packets, cache=True):
         self._logger.debug('processing %d packets', len(packets))
-        StandaloneEndpoint.data_came_in(self, packets, cache=cache)
+        yield StandaloneEndpoint.data_came_in(self, packets, cache=cache)
