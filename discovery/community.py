@@ -6,11 +6,7 @@ from random import random, shuffle
 from time import time
 
 from twisted.internet import reactor
-<<<<<<< HEAD
-from twisted.internet.defer import inlineCallbacks
-=======
 from twisted.internet.defer import inlineCallbacks, returnValue
->>>>>>> Refactored the discovery community to handle the deferreds returned by StormDBManager and its callers
 from twisted.internet.task import LoopingCall
 
 from ..authentication import MemberAuthentication, NoAuthentication
