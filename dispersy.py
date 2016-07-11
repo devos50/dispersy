@@ -970,7 +970,7 @@ class Dispersy(TaskManager):
             # this message is a duplicate
             returnValue(True)
 
-    @attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution full_sync")
+    #@attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution full_sync")
     @inlineCallbacks
     def _check_full_sync_distribution_batch(self, messages):
         """
@@ -1122,7 +1122,7 @@ class Dispersy(TaskManager):
                 return_list.append(message)
         returnValue(iter(return_list))
 
-    @attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution last_sync")
+    #@attach_runtime_statistics(u"{0.__class__.__name__}._check_distribution last_sync")
     @inlineCallbacks
     def _check_last_sync_distribution_batch(self, messages):
         """
@@ -1564,7 +1564,7 @@ class Dispersy(TaskManager):
         else:
             self._logger.info("dropping %d packets as dispersy is not running", len(packets))
 
-    @attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
+    #@attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
     @inlineCallbacks
     def _store(self, messages):
         """
@@ -1815,7 +1815,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
 
         returnValue(True)
 
-    @attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
+    #@attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
     @inlineCallbacks
     def _update(self, messages):
         """
@@ -1830,7 +1830,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id))
             self._logger.exception("exception during handle_callback for %s", messages[0].name)
             returnValue(False)
 
-    @attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
+    #@attach_runtime_statistics(u"Dispersy.{function_name} {1[0].name}")
     @inlineCallbacks
     def _forward(self, messages):
         """
