@@ -2187,6 +2187,8 @@ class Community(TaskManager):
         assert all(message.community == messages[0].community for message in messages)
         assert all(message.meta == messages[0].meta for message in messages)
 
+        self._logger.debug("Community on_messag received %s messages", len(messages))
+
         @inlineCallbacks
         def _filter_fail(message):
             if isinstance(message, DelayMessage):
@@ -2269,6 +2271,7 @@ class Community(TaskManager):
 
         # store to disk and update locally
         result = yield self._dispersy.store_update_forward(possibly_messages, True, True, False)
+        self._logger.debug("Community on_messages, result of store_update_foward %s", result)
         if result:
             self._statistics.increase_msg_count(u"success", meta.name, len(messages))
 
