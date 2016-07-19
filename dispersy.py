@@ -1589,11 +1589,6 @@ class Dispersy(TaskManager):
         assert all(isinstance(message.distribution, SyncDistribution.Implementation) for message in messages)
         # ensure no duplicate messages are present, this MUST HAVE been checked before calling this
         # method!
-        for message in messages:
-            self._logger.error("LE LIST: %s %s", message.authentication.member.database_id, message.distribution.global_time)
-        self._logger.error("LE SET: %s", set((message.authentication.member.database_id, message.distribution.global_time) for message in messages))
-        self._logger.error("SIZES %s vs %s", len(messages), len(
-            set((message.authentication.member.database_id, message.distribution.global_time) for message in messages)))
         assert len(messages) == len(set((message.authentication.member.database_id, message.distribution.global_time) for message in messages)), messages[0].name
 
         meta = messages[0].meta
@@ -1615,9 +1610,6 @@ class Dispersy(TaskManager):
                                message.authentication.member.database_id, message.distribution.global_time)
 
             # add packet to database
-            self._logger.error("COMBINATION: %s %s %s", message.community.database_id, message.authentication.member.database_id, (message.distribution.sequence_number if
-                 isinstance(meta.distribution, FullSyncDistribution)
-                 and message.distribution.enable_sequence_number else None))
             message.packet_id = yield self._database.stormdb.execute(
                 u"INSERT INTO sync (community, member, global_time, meta_message, packet, sequence) "
                 u"VALUES (?, ?, ?, ?, ?, ?)",
