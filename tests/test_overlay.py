@@ -37,9 +37,9 @@ class TestOverlay(DispersyTestFunc):
 
     @skipUnless(environ.get("TEST_OVERLAY_SEARCH") == "yes", "This 'unittest' tests the health of a live overlay, as such, this is not part of the code review process")
     def test_search_community(self):
-        return self.check_live_overlay(cid_hex="2782dc9253cef6cc9272ee8ed675c63743c4eb3a",
+        return self.check_live_overlay(cid_hex="fb04df93369587ec8fd9b74559186fa356cffda8",
                                        version="\x01",
-                                       enable_fast_walker=True)
+                                       enable_fast_walker=False)
 
     @blocking_call_on_reactor_thread
     @inlineCallbacks
@@ -159,6 +159,6 @@ class TestOverlay(DispersyTestFunc):
                     "%s:%d" % info.wan_address,
                     info.connection_type))
 
-        # determine test success or failure (hard coded for 10.0 or higher being a success)
+        # determine test success or failure (hard coded for 1 or higher being a success)
         summary_logger.debug("Average verified candidates: %.1f", average_verified_candidates)
-        self.assertGreater(average_verified_candidates, 10.0)
+        self.assertGreater(average_verified_candidates, 1.0)
