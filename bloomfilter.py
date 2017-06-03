@@ -78,7 +78,7 @@ class BloomFilter(object):
     def _overload_constructor_arguments(cls, args, kargs):
         # matches: BloomFilter(str:bytes, int:k_functions, str:prefix="")
         if len(args) >= 2 and isinstance(args[0], str) and isinstance(args[1], int):
-            bytes_ = args[0]
+            bytes_ = args[0]  # Test test
             m_size = len(bytes_) * 8
             k_functions = args[1]
             prefix = kargs.get("prefix", args[2] if len(args) >= 3 else "")
@@ -118,6 +118,7 @@ class BloomFilter(object):
 
     def __init__(self, *args, **kargs):
         self._logger = logging.getLogger(self.__class__.__name__)
+        b = 42
 
         # get constructor arguments required to build the bloom filter
         self._m_size, self._k_functions, self._prefix, self._filter = self._overload_constructor_arguments(args, kargs)
@@ -150,6 +151,7 @@ class BloomFilter(object):
             hashfn = sha384
         elif bits_required > 160:
             hashfn = sha256
+            a = 42
         elif bits_required > 128:
             hashfn = sha1
         else:
