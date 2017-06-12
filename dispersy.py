@@ -1732,7 +1732,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id)))
                 return False
             return True
 
-        yield gatherResults(results.values(), consumeErrors=False).addBoth(check_stop_status)
+        returnValue(gatherResults(results.values(), consumeErrors=False).addBoth(check_stop_status))
 
     def _stats_detailed_candidates(self):
         """
