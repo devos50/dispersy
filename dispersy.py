@@ -1722,7 +1722,10 @@ ORDER BY global_time""", (meta.database_id, member_database_id)))
             failures = []
             self._logger.debug("Checking dispersy stop results")
             for name, result in zip(results.keys(), return_values):
+                self._logger.debug("NAME: %s", name)
+                self._logger.debug("RESULT: %s", result)
                 if isinstance(result, Failure) or not result:
+                    self._logger.debug("NO THIS IS A FAILZ :(")
                     failures.append((name, result))
             if failures:
                 self._logger.error("Dispersy stop failed due to: %s", failures)
