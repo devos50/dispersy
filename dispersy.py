@@ -1720,7 +1720,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id)))
 
         def check_stop_status(return_values):
             failures = []
-            self._logger.debug("Checking dispersy stop results")
+            self._logger.debug("Checking dispersy stop results %s", return_values)
             for name, result in zip(results.keys(), return_values):
                 self._logger.debug("NAME: %s", name)
                 self._logger.debug("RESULT: %s", result)
@@ -1732,7 +1732,7 @@ ORDER BY global_time""", (meta.database_id, member_database_id)))
                 return False
             return True
 
-        yield gatherResults(results.values(), consumeErrors=True).addBoth(check_stop_status)
+        yield gatherResults(results.values(), consumeErrors=False).addBoth(check_stop_status)
 
     def _stats_detailed_candidates(self):
         """
